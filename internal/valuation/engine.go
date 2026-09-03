@@ -3,6 +3,7 @@ package valuation
 import (
 	"context"
 	"crypto/md5"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -108,6 +109,7 @@ func (e *ValuationEngine) Valuate(
 		AlgorithmVersion:      params.AlgorithmVersion,
 		ConfigurationVersion:  params.ConfigurationVersion,
 		OutlierMethod:         params.OutlierMethod,
+		Weights:               e.weightsJSON(),
 		BearValue:             int64(bearValue),
 		BaseValue:             int64(baseValue),
 		BullValue:             int64(bullValue),
@@ -316,6 +318,16 @@ func WeightedMedian(prices []float64, weights []float64) float64 {
 	}
 
 	return pairs[len(pairs)-1].price
+}
+// weightsJSON returns the valuation weights as JSON RawMessage.
+func (e *ValuationEngine) weightsJSON() json.RawMessage {
+	weights := map[string]interface{}{
+		"minimum_required_comparables": e.config.MinimumRequiredComparables,
+		"outlier_method":              e.config.OutlierMethod,
+		"iqr_k":                       e.config.IQRK,
+	}
+	b, _ := json.Marshal(weights)
+	return b
 }
 
 // ErrInsufficientComparables is returned when insufficient comparable transactions

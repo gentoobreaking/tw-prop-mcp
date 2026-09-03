@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -25,6 +26,8 @@ type ValuationResult struct {
 	AlgorithmVersion    string             `json:"algorithm_version"`
 	ConfigurationVersion string            `json:"configuration_version"`
 	OutlierMethod       string             `json:"outlier_method"`
+	// Weights stored as JSONB (e.g., scoring weights used)
+	Weights           json.RawMessage `json:"weights,omitempty"`
 
 	// Valuation range (per ping, 元/坪)
 	BearValue  int64   `json:"bear_value"`   // P25 adjusted

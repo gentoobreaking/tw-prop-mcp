@@ -24,6 +24,9 @@ type Querier interface {
 	DeleteParcelRoadAccess(ctx context.Context, id pgtype.UUID) error
 	FindNearbyRoads(ctx context.Context, arg FindNearbyRoadsParams) ([]FindNearbyRoadsRow, error)
 	GetAlgorithmVersion(ctx context.Context, version string) (AlgorithmVersion, error)
+	GetComparableResultByID(ctx context.Context, id pgtype.UUID) (ComparableResult, error)
+	// Configuration queries
+	// Used by config service and provenance lookups
 	GetConfig(ctx context.Context, version string) (ConfigurationSnapshot, error)
 	GetParcelByID(ctx context.Context, id pgtype.UUID) (Parcel, error)
 	GetParcelByLandNumber(ctx context.Context, arg GetParcelByLandNumberParams) (Parcel, error)
@@ -37,13 +40,20 @@ type Querier interface {
 	// percentile_cont for total_price (p25/p50/p75) and area medians by county/district/section.
 	GetTransactionPercentiles(ctx context.Context, arg GetTransactionPercentilesParams) (GetTransactionPercentilesRow, error)
 	GetTransactionStats(ctx context.Context, arg GetTransactionStatsParams) (GetTransactionStatsRow, error)
+	// Valuation result queries
+	// ValuationResultRepository operations
 	GetValuationResult(ctx context.Context, id pgtype.UUID) (ValuationResult, error)
+	GetValuationResultByQueryHash(ctx context.Context, queryHash string) (ValuationResult, error)
+	// Comparable result queries
+	// ComparableResultRepository operations
 	InsertComparableResult(ctx context.Context, arg InsertComparableResultParams) (ComparableResult, error)
 	InsertValuationResult(ctx context.Context, arg InsertValuationResultParams) (ValuationResult, error)
+	// Deterministic ordering: total_score DESC, then distance_m ASC, then transaction_id ASC
 	ListComparableResults(ctx context.Context, arg ListComparableResultsParams) ([]ComparableResult, error)
 	ListParcelRoadAccess(ctx context.Context, arg ListParcelRoadAccessParams) ([]ParcelRoadAccess, error)
 	ListRoadSegments(ctx context.Context, arg ListRoadSegmentsParams) ([]RoadSegment, error)
 	ListSnapshots(ctx context.Context) ([]DatasetSnapshot, error)
+	ListValuationResultsByParcel(ctx context.Context, arg ListValuationResultsByParcelParams) ([]ValuationResult, error)
 	LockSnapshot(ctx context.Context, id pgtype.UUID) error
 	SearchParcels(ctx context.Context, arg SearchParcelsParams) ([]Parcel, error)
 	SearchTransactions(ctx context.Context, arg SearchTransactionsParams) ([]Transaction, error)
