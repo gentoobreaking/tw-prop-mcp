@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type BatchInsertParcelsParams struct {
+	County          string         `json:"county"`
+	District        string         `json:"district"`
+	Section         string         `json:"section"`
+	LandNumber      string         `json:"land_number"`
+	AreaSqm         pgtype.Numeric `json:"area_sqm"`
+	UrbanZoning     pgtype.Text    `json:"urban_zoning"`
+	LandUseCategory pgtype.Text    `json:"land_use_category"`
+	Geometry        string         `json:"geometry"`
+	Centroid        interface{}    `json:"centroid"`
+	Bbox            interface{}    `json:"bbox"`
+	Source          string         `json:"source"`
+	SourceVersion   string         `json:"source_version"`
+	ImportBatchID   pgtype.UUID    `json:"import_batch_id"`
+}
+
 const checkRoadAccess = `-- name: CheckRoadAccess :one
 SELECT id, parcel_id, road_id, distance_m, nearest_point, road_width_m, access_type, source, algorithm_version, computed_at FROM parcel_road_access WHERE parcel_id=$1 AND algorithm_version=$2 LIMIT 1
 `

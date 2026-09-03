@@ -25,3 +25,16 @@ LIMIT $3;
 
 -- name: CheckRoadAccess :one
 SELECT * FROM parcel_road_access WHERE parcel_id=$1 AND algorithm_version=$2 LIMIT 1;
+
+-- name: BatchInsertParcels :copyfrom
+INSERT INTO parcel (
+    county, district, section, land_number, area_sqm,
+    urban_zoning, land_use_category,
+    geometry, centroid, bbox,
+    source, source_version, import_batch_id
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7,
+    $8, $9, $10,
+    $11, $12, $13
+);
