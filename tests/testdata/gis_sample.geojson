@@ -1,0 +1,68 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [120.1745, 23.1092],
+            [120.1755, 23.1092],
+            [120.1755, 23.1102],
+            [120.1745, 23.1102],
+            [120.1745, 23.1092]
+          ]
+        ]
+      },
+      "properties": {
+        "COUNTY": "台南市",
+        "TOWN": "安南區",
+        "SECTION": "竹篙灣段",
+        "LAN_NO": "0001",
+        "AREA": 10245.6,
+        "URBAN_ZONING": "工業區",
+        "LAND_USE": "工業"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [120.1755, 23.1092],
+            [120.1765, 23.1092],
+            [120.1765, 23.1102],
+            [120.1755, 23.1102],
+            [120.1755, 23.1092]
+          ]
+        ]
+      },
+      "properties": {
+        "COUNTY": "台南市",
+        "TOWN": "安南區",
+        "SECTION": "竹篙灣段",
+        "LAN_NO": "0002",
+        "AREA": 10245.6,
+        "URBAN_ZONING": "工業區",
+        "LAND_USE": "工業"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [120.1740, 23.1097],
+          [120.1770, 23.1097]
+        ]
+      },
+      "properties": {
+        "NAME": "海安路",
+        "CLASS": "市道",
+        "WIDTH": 15
+      }
+    }
+  ]
+}
