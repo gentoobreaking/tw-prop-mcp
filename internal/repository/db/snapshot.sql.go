@@ -49,22 +49,24 @@ func (q *Queries) CreateImportBatch(ctx context.Context, snapshotID pgtype.UUID)
 }
 
 const createSnapshot = `-- name: CreateSnapshot :one
-INSERT INTO dataset_snapshot (source, source_version, file_name, file_sha256, record_count, status, schema_version)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, source, source_version, downloaded_at, published_at, file_name, file_sha256, record_count, status, schema_version, import_started_at, import_completed_at, created_at
+INSERT INTO dataset_snapshot (id, source, source_version, file_name, file_sha256, record_count, status, schema_version, published_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL) RETURNING id, source, source_version, downloaded_at, published_at, file_name, file_sha256, record_count, status, schema_version, import_started_at, import_completed_at, created_at
 `
 
 type CreateSnapshotParams struct {
-	Source        string `json:"source"`
-	SourceVersion string `json:"source_version"`
-	FileName      string `json:"file_name"`
-	FileSha256    string `json:"file_sha256"`
-	RecordCount   int64  `json:"record_count"`
-	Status        string `json:"status"`
-	SchemaVersion string `json:"schema_version"`
+	ID            pgtype.UUID `json:"id"`
+	Source        string      `json:"source"`
+	SourceVersion string      `json:"source_version"`
+	FileName      string      `json:"file_name"`
+	FileSha256    string      `json:"file_sha256"`
+	RecordCount   int64       `json:"record_count"`
+	Status        string      `json:"status"`
+	SchemaVersion string      `json:"schema_version"`
 }
 
 func (q *Queries) CreateSnapshot(ctx context.Context, arg CreateSnapshotParams) (DatasetSnapshot, error) {
 	row := q.db.QueryRow(ctx, createSnapshot,
+		arg.ID,
 		arg.Source,
 		arg.SourceVersion,
 		arg.FileName,

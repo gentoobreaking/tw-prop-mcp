@@ -3,10 +3,13 @@ package integration
 import (
 	"context"
 	"embed"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -72,19 +75,8 @@ func TestImportPipeline_Integration(t *testing.T) {
 	parcelRepo := repository.NewParcelRepository(pool)
 	snapshotRepo := repository.NewSnapshotRepository(pool)
 
-	// Create a test snapshot
-	snapshotID := "test-snapshot-" + time.Now().Format("20060102150405")
-	_, err = snapshotRepo.Create(ctx, repository.CreateSnapshotParams{
-		SourceVersion:  "v2.0",
-		FileName:       "sample.csv",
-		FileSHA256:     "",
-		RecordCount:    0,
-		Status:         "PENDING",
-		SchemaVersion:  "v2.0",
-	})
-	if err != nil {
-		t.Fatalf("create snapshot: %v", err)
-	}
+	// Use a valid UUID for snapshot ID (pipeline will create the snapshot)
+	snapshotID := uuid.New().String()
 
 	// Read sample CSV
 	csvData, err := sampleCSVFS.ReadFile("testdata/sample.csv")
@@ -103,10 +95,15 @@ func TestImportPipeline_Integration(t *testing.T) {
 	}
 	tmpFile.Close()
 
-	// Create import pipeline
+	// Create import pipeline - serve file via HTTP
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, tmpFile.Name())
+	}))
+	defer server.Close()
+
 	p := importpipeline.NewImportPipeline(importpipeline.PipelineConfig{
 		SnapshotID:   snapshotID,
-		DownloadURL:  "file://" + tmpFile.Name(),
+		DownloadURL:  server.URL,
 		DownloadDest: tmpFile.Name(),
 		MaxRetries:   1,
 		RetryDelay:   100 * time.Millisecond,

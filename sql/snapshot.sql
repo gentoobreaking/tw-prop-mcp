@@ -1,6 +1,6 @@
 -- name: CreateSnapshot :one
-INSERT INTO dataset_snapshot (source, source_version, file_name, file_sha256, record_count, status, schema_version)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO dataset_snapshot (id, source, source_version, file_name, file_sha256, record_count, status, schema_version, published_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL) RETURNING *;
 
 -- name: GetSnapshotByID :one
 SELECT * FROM dataset_snapshot WHERE id = $1 LIMIT 1;

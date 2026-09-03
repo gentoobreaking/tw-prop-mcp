@@ -26,6 +26,7 @@ type SnapshotRepository interface {
 
 // CreateSnapshotParams mirrors required fields for creation.
 type CreateSnapshotParams struct {
+	ID            string
 	Source        string
 	SourceVersion string
 	FileName      string
@@ -56,12 +57,16 @@ func NewSnapshotRepository(dbt DBTX) SnapshotRepository {
 	}
 }
 
-// Create inserts a new snapshot row.
 func (r *snapshotRepository) Create(ctx context.Context, arg CreateSnapshotParams) (domain.DatasetSnapshot, error) {
 	if !domain.IsValidStatus(arg.Status) {
 		return domain.DatasetSnapshot{}, fmt.Errorf("invalid status: %s", arg.Status)
 	}
+	uid, err := parseUUID(arg.ID)
+	if err != nil {
+		return domain.DatasetSnapshot{}, err
+	}
 	row, err := r.queries.CreateSnapshot(ctx, db.CreateSnapshotParams{
+		ID:            uid,
 		Source:        arg.Source,
 		SourceVersion: arg.SourceVersion,
 		FileName:      arg.FileName,

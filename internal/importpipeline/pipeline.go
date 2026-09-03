@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/google/uuid"
+
 	"tw-prop-mcp/internal/downloader"
 	"tw-prop-mcp/internal/domain"
 	"tw-prop-mcp/internal/normalizer"
@@ -172,10 +174,22 @@ func (p *ImportPipeline) ImportFromSource(ctx context.Context) (ImportResult, er
 
 	// Stage 6: Deduplicate
 	p.setStatus(StatusImporting)
+
+	// Update snapshot status to IMPORTING before import
+	if p.SnapshotRepo != nil {
+		if err := p.SnapshotRepo.UpdateStatus(ctx, p.Config.SnapshotID, domain.SnapshotStatusImporting); err != nil {
+			p.setStatus(StatusFailed)
+			return result, p.wrapError("update_snapshot_status", err)
+		}
+	}
+
 	dedupedTxns, dedupedParcels := p.deduplicate(validTxns, validParcels)
 
+	// Create import batch
+	importBatchID := uuid.NewString()
+
 	// Stage 7: Import
-	if err := p.importData(ctx, dedupedTxns, dedupedParcels); err != nil {
+	if err := p.importData(ctx, dedupedTxns, dedupedParcels, importBatchID); err != nil {
 		p.setStatus(StatusFailed)
 		return result, p.wrapError("import", err)
 	}
@@ -206,8 +220,9 @@ func (p *ImportPipeline) initSnapshot(ctx context.Context) error {
 		return nil // already exists
 	}
 
-	// Create new snapshot
+	// Create new snapshot with the configured SnapshotID
 	_, err = p.SnapshotRepo.Create(ctx, repository.CreateSnapshotParams{
+		ID:             p.Config.SnapshotID,
 		Source:         "OFFICIAL_CSV",
 		SourceVersion:  "v2.0",
 		FileName:       filepath.Base(p.Config.DownloadURL),
@@ -366,13 +381,16 @@ func (p *ImportPipeline) deduplicate(transactions []domain.Transaction, parcels 
 }
 
 // importData inserts data into the database.
-func (p *ImportPipeline) importData(ctx context.Context, transactions []domain.Transaction, parcels []domain.Parcel) error {
+func (p *ImportPipeline) importData(ctx context.Context, transactions []domain.Transaction, parcels []domain.Parcel, importBatchID string) error {
 	if p.TxRepo == nil || p.ParcelRepo == nil {
 		return errors.New("repositories not set")
 	}
 
 	// Import transactions
 	if len(transactions) > 0 {
+		for i := range transactions {
+			transactions[i].ImportBatchID = importBatchID
+		}
 		inserted, err := p.TxRepo.BatchInsert(ctx, transactions)
 		if err != nil {
 			return fmt.Errorf("batch insert transactions: %w", err)
