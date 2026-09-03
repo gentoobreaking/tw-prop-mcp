@@ -104,9 +104,10 @@ func (m *mockRows) Conn() *pgx.Conn { return nil }
 
 // mockDBTX implements DBTX with function hooks
 type mockDBTX struct {
-	queryRowFn func(ctx context.Context, sql string, args ...any) pgx.Row
-	queryFn    func(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	execFn     func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	queryRowFn  func(ctx context.Context, sql string, args ...any) pgx.Row
+	queryFn     func(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	execFn      func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	copyFromFn  func(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 }
 
 func (m *mockDBTX) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
@@ -128,6 +129,9 @@ func (m *mockDBTX) Exec(ctx context.Context, sql string, args ...any) (pgconn.Co
 	return pgconn.NewCommandTag(""), nil
 }
 func (m *mockDBTX) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
+	if m.copyFromFn != nil {
+		return m.copyFromFn(ctx, tableName, columnNames, rowSrc)
+	}
 	return 0, nil
 }
 

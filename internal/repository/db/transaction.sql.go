@@ -74,6 +74,45 @@ func (q *Queries) GetTransactionByID(ctx context.Context, id pgtype.UUID) (Trans
 	return i, err
 }
 
+const getTransactionPercentiles = `-- name: GetTransactionPercentiles :one
+SELECT
+    COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY total_price), 0)::float8 AS median_price,
+    COALESCE(percentile_cont(0.25) WITHIN GROUP (ORDER BY total_price), 0)::float8 AS p25_price,
+    COALESCE(percentile_cont(0.75) WITHIN GROUP (ORDER BY total_price), 0)::float8 AS p75_price,
+    COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY land_area_sqm), 0)::float8 AS median_land_area,
+    COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY building_area_sqm), 0)::float8 AS median_building_area
+FROM transaction
+WHERE county = $1 AND district = $2 AND section = $3
+`
+
+type GetTransactionPercentilesParams struct {
+	County   string      `json:"county"`
+	District string      `json:"district"`
+	Section  pgtype.Text `json:"section"`
+}
+
+type GetTransactionPercentilesRow struct {
+	MedianPrice        float64 `json:"median_price"`
+	P25Price           float64 `json:"p25_price"`
+	P75Price           float64 `json:"p75_price"`
+	MedianLandArea     float64 `json:"median_land_area"`
+	MedianBuildingArea float64 `json:"median_building_area"`
+}
+
+// percentile_cont for total_price (p25/p50/p75) and area medians by county/district/section.
+func (q *Queries) GetTransactionPercentiles(ctx context.Context, arg GetTransactionPercentilesParams) (GetTransactionPercentilesRow, error) {
+	row := q.db.QueryRow(ctx, getTransactionPercentiles, arg.County, arg.District, arg.Section)
+	var i GetTransactionPercentilesRow
+	err := row.Scan(
+		&i.MedianPrice,
+		&i.P25Price,
+		&i.P75Price,
+		&i.MedianLandArea,
+		&i.MedianBuildingArea,
+	)
+	return i, err
+}
+
 const getTransactionStats = `-- name: GetTransactionStats :one
 SELECT
     COUNT(*)::bigint AS cnt,
@@ -113,8 +152,8 @@ const searchTransactions = `-- name: SearchTransactions :many
 SELECT id, snapshot_id, import_batch_id, transaction_id, transaction_date, transaction_type, county, district, section, land_number, transaction_target, total_price, unit_price, land_area_sqm, building_area_sqm, urban_zoning, non_urban_zoning, land_use_category, building_type, floor, age, parking_area_sqm, parking_price, source_record_hash, created_at FROM transaction
 WHERE county = $1
   AND district = $2
-  AND ($3::text IS NULL OR section = $3)
-  AND ($4::text IS NULL OR land_number = $4)
+  AND ($3::text = '' OR section = $3)
+  AND ($4::text = '' OR land_number = $4)
   AND ($5::date IS NULL OR transaction_date >= $5)
   AND ($6::date IS NULL OR transaction_date <= $6)
 ORDER BY transaction_date DESC, id ASC

@@ -24,6 +24,8 @@ type Querier interface {
 	GetParcelGeometry(ctx context.Context, id pgtype.UUID) (GetParcelGeometryRow, error)
 	GetSnapshotByID(ctx context.Context, id pgtype.UUID) (DatasetSnapshot, error)
 	GetTransactionByID(ctx context.Context, id pgtype.UUID) (Transaction, error)
+	// percentile_cont for total_price (p25/p50/p75) and area medians by county/district/section.
+	GetTransactionPercentiles(ctx context.Context, arg GetTransactionPercentilesParams) (GetTransactionPercentilesRow, error)
 	GetTransactionStats(ctx context.Context, arg GetTransactionStatsParams) (GetTransactionStatsRow, error)
 	GetValuationResult(ctx context.Context, id pgtype.UUID) (ValuationResult, error)
 	InsertComparableResult(ctx context.Context, arg InsertComparableResultParams) (ComparableResult, error)
