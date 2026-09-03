@@ -5,36 +5,37 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+
 	"tw-prop-mcp/internal/domain"
 	"tw-prop-mcp/internal/repository/db"
 )
-
 // ValuationResult errors.
 var (
 	ErrValuationResultNotFound = fmt.Errorf("valuation result not found")
 )
 
-// ValuationResultRepository defines persistence operations for valuation_result.
-// T029 acceptance criteria:
-// - Insert(result)
-// - GetByID(valuation_id)
-// - ListByParcel(parcel_id, snapshot_id)
 type ValuationResultRepository interface {
 	Insert(ctx context.Context, result domain.ValuationResult) (domain.ValuationResult, error)
 	GetByID(ctx context.Context, id string) (domain.ValuationResult, error)
 	ListByParcel(ctx context.Context, parcelID, snapshotID string, limit int32) ([]domain.ValuationResult, error)
 	GetByQueryHash(ctx context.Context, queryHash string) (domain.ValuationResult, error)
+	// PersistValuation atomically inserts a valuation result and its comparables
+	// in a single transaction. If any insert fails, the transaction rolls back.
+	// Forces provenance validation on both valuation and comparables.
+	PersistValuation(ctx context.Context, valuation domain.ValuationResult, comparables []domain.ComparableResult) (domain.ValuationResult, error)
+}
+
+func NewValuationResultRepository(dbt DBTX) ValuationResultRepository {
+	return &valuationResultRepository{
+		db:      dbt,
+		queries: db.New(dbt),
+	}
 }
 
 type valuationResultRepository struct {
+	db      DBTX
 	queries *db.Queries
-}
-
-// NewValuationResultRepository creates a repository backed by pgx + sqlc.
-func NewValuationResultRepository(dbt DBTX) ValuationResultRepository {
-	return &valuationResultRepository{
-		queries: db.New(dbt),
-	}
 }
 
 // Insert inserts a valuation result with forced provenance.
@@ -156,6 +157,150 @@ func (r *valuationResultRepository) GetByQueryHash(ctx context.Context, queryHas
 	}
 
 	return toDomainValuationResult(row), nil
+}
+// PersistValuation atomically inserts a valuation result and its comparable results.
+// Uses a database transaction: if any insert fails, the transaction rolls back.
+// Forces provenance validation on both valuation and comparables.
+func (r *valuationResultRepository) PersistValuation(ctx context.Context, valuation domain.ValuationResult, comparables []domain.ComparableResult) (domain.ValuationResult, error) {
+	// Validate valuation provenance
+	if valuation.SnapshotID == "" {
+		return domain.ValuationResult{}, fmt.Errorf("INVALID_ARGUMENT: missing snapshot_id")
+	}
+	if valuation.AlgorithmVersion == "" {
+		return domain.ValuationResult{}, fmt.Errorf("INVALID_ARGUMENT: missing algorithm_version")
+	}
+	if valuation.ConfigurationVersion == "" {
+		return domain.ValuationResult{}, fmt.Errorf("INVALID_ARGUMENT: missing configuration_version")
+	}
+	if valuation.TargetParcelID == "" {
+		return domain.ValuationResult{}, fmt.Errorf("INVALID_ARGUMENT: missing target_parcel_id")
+	}
+
+	// Validate comparables provenance
+	for i, c := range comparables {
+		if c.TargetTransactionID == "" {
+			return domain.ValuationResult{}, fmt.Errorf("comparable at index %d missing target_transaction_id", i)
+		}
+		if c.AlgorithmVersion == "" {
+			return domain.ValuationResult{}, fmt.Errorf("comparable at index %d missing algorithm_version", i)
+		}
+	}
+
+	var result domain.ValuationResult
+
+	// Use pgx.BeginFunc for atomic transaction: if any insert fails, the transaction rolls back.
+	beginer, ok := r.db.(interface{ Begin(ctx context.Context) (pgx.Tx, error) })
+	if !ok {
+		return domain.ValuationResult{}, fmt.Errorf("dbtx does not support transactions")
+	}
+	err := pgx.BeginFunc(ctx, beginer, func(tx pgx.Tx) error {
+		txQueries := r.queries.WithTx(tx)
+
+		// Parse UUIDs
+		targetParcelID, err := parseUUID(valuation.TargetParcelID)
+		if err != nil {
+			return fmt.Errorf("invalid target_parcel_id: %w", err)
+		}
+		snapshotID, err := parseUUID(valuation.SnapshotID)
+		if err != nil {
+			return fmt.Errorf("invalid snapshot_id: %w", err)
+		}
+
+		comparableIDsJSON, err := json.Marshal(valuation.ComparableIDs)
+		if err != nil {
+			return fmt.Errorf("marshal comparable_ids: %w", err)
+		}
+		weightsJSON, err := json.Marshal(valuation.Weights)
+		if err != nil {
+			return fmt.Errorf("marshal weights: %w", err)
+		}
+		statsJSON, err := json.Marshal(valuation.RawStatistics)
+		if err != nil {
+			return fmt.Errorf("marshal statistics: %w", err)
+		}
+
+		valuationParams := db.InsertValuationResultParams{
+			TargetParcelID:       targetParcelID,
+			SnapshotID:           snapshotID,
+			ComparableIds:        comparableIDsJSON,
+			AlgorithmVersion:     valuation.AlgorithmVersion,
+			ConfigurationVersion: valuation.ConfigurationVersion,
+			OutlierMethod:        valuation.OutlierMethod,
+			Weights:              weightsJSON,
+			Statistics:           statsJSON,
+			BearValue:            valuation.BearValue,
+			BaseValue:            valuation.BaseValue,
+			BullValue:            valuation.BullValue,
+			Confidence:           string(valuation.Confidence),
+			QueryHash:            valuation.QueryHash,
+		}
+
+		// Insert the valuation result first
+		valuationRow, err := txQueries.InsertValuationResult(ctx, valuationParams)
+		if err != nil {
+			return fmt.Errorf("insert valuation result: %w", err)
+		}
+
+		// Insert comparable results, linked by target_parcel_id (same as valuation)
+		for _, c := range comparables {
+			targetParcelID, err := parseUUID(c.TargetTransactionID)
+			if err != nil {
+				return fmt.Errorf("invalid comparable target_parcel_id: %w", err)
+			}
+			candidateTxnID, err := parseUUID(c.CandidateTransactionID)
+			if err != nil {
+				return fmt.Errorf("invalid candidate transaction ID: %w", err)
+			}
+
+			distanceM, err := toNumeric(c.DistanceM)
+			if err != nil {
+				return fmt.Errorf("scan distance_m: %w", err)
+			}
+			areaSim, err := toNumeric(c.AreaSimilarity)
+			if err != nil {
+				return fmt.Errorf("scan area_similarity: %w", err)
+			}
+			timeScore, err := toNumeric(c.TimeScore)
+			if err != nil {
+				return fmt.Errorf("scan time_score: %w", err)
+			}
+			distanceScore, err := toNumeric(c.DistanceScore)
+			if err != nil {
+				return fmt.Errorf("scan distance_score: %w", err)
+			}
+			totalScore, err := toNumeric(c.TotalScore)
+			if err != nil {
+				return fmt.Errorf("scan total_score: %w", err)
+			}
+
+			compParams := db.InsertComparableResultParams{
+				TargetParcelID:         targetParcelID,
+				CandidateTransactionID: candidateTxnID,
+				DistanceM:              distanceM,
+				AreaSimilarity:         areaSim,
+				ZoningMatch:            c.ZoningMatch,
+				LandUseMatch:           c.LandUseMatch,
+				RoadAccessMatch:        c.RoadAccessMatch,
+				TimeScore:              timeScore,
+				DistanceScore:          distanceScore,
+				TotalScore:             totalScore,
+				AlgorithmVersion:       c.AlgorithmVersion,
+			}
+
+			_, err = txQueries.InsertComparableResult(ctx, compParams)
+			if err != nil {
+				return fmt.Errorf("insert comparable result: %w", err)
+			}
+		}
+
+		result = toDomainValuationResult(valuationRow)
+		return nil
+	})
+	if err != nil {
+		return domain.ValuationResult{}, fmt.Errorf("persist valuation: %w", err)
+	}
+
+	return result, nil
 }
 
 // toDomainValuationResult converts db.ValuationResult to domain.ValuationResult.

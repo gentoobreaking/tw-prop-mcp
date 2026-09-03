@@ -160,3 +160,95 @@ func TestValuationResultRepository_ListByParcel_Validation(t *testing.T) {
 		t.Error("expected error for invalid UUID")
 	}
 }
+// TestValuationResultRepository_PersistValuation_MissingSnapshotID
+func TestValuationResultRepository_PersistValuation_MissingSnapshotID(t *testing.T) {
+	repo := repository.NewValuationResultRepository(nil)
+
+	valuation := domain.ValuationResult{
+		TargetParcelID:       uuid.NewString(),
+		AlgorithmVersion:     "v2.0",
+		ConfigurationVersion: "v2.0",
+	}
+
+	_, err := repo.PersistValuation(context.Background(), valuation, nil)
+	if err == nil {
+		t.Error("expected error for missing snapshot_id")
+	}
+}
+
+// TestValuationResultRepository_PersistValuation_MissingAlgorithmVersion
+func TestValuationResultRepository_PersistValuation_MissingAlgorithmVersion(t *testing.T) {
+	repo := repository.NewValuationResultRepository(nil)
+
+	valuation := domain.ValuationResult{
+		TargetParcelID:       uuid.NewString(),
+		SnapshotID:           uuid.NewString(),
+		ConfigurationVersion: "v2.0",
+	}
+
+	_, err := repo.PersistValuation(context.Background(), valuation, nil)
+	if err == nil {
+		t.Error("expected error for missing algorithm_version")
+	}
+}
+
+// TestValuationResultRepository_PersistValuation_ComparableMissingTarget
+func TestValuationResultRepository_PersistValuation_ComparableMissingTarget(t *testing.T) {
+	repo := repository.NewValuationResultRepository(nil)
+
+	valuation := domain.ValuationResult{
+		TargetParcelID:       uuid.NewString(),
+		SnapshotID:           uuid.NewString(),
+		AlgorithmVersion:     "v2.0",
+		ConfigurationVersion: "v2.0",
+	}
+	comparables := []domain.ComparableResult{
+		{CandidateTransactionID: uuid.NewString()}, // missing target_transaction_id
+	}
+
+	_, err := repo.PersistValuation(context.Background(), valuation, comparables)
+	if err == nil {
+		t.Error("expected error for comparable missing target_transaction_id")
+	}
+}
+
+// TestValuationResultRepository_PersistValuation_ComparableMissingAlgorithm
+func TestValuationResultRepository_PersistValuation_ComparableMissingAlgorithm(t *testing.T) {
+	repo := repository.NewValuationResultRepository(nil)
+
+	valuation := domain.ValuationResult{
+		TargetParcelID:       uuid.NewString(),
+		SnapshotID:           uuid.NewString(),
+		AlgorithmVersion:     "v2.0",
+		ConfigurationVersion: "v2.0",
+	}
+	comparables := []domain.ComparableResult{
+		{
+			TargetTransactionID: uuid.NewString(),
+			// missing algorithm_version
+		},
+	}
+
+	_, err := repo.PersistValuation(context.Background(), valuation, comparables)
+	if err == nil {
+		t.Error("expected error for comparable missing algorithm_version")
+	}
+}
+
+// TestValuationResultRepository_PersistValuation_NilDBTX
+func TestValuationResultRepository_PersistValuation_NilDBTX(t *testing.T) {
+	repo := repository.NewValuationResultRepository(nil)
+
+	valuation := domain.ValuationResult{
+		TargetParcelID:       uuid.NewString(),
+		SnapshotID:           uuid.NewString(),
+		AlgorithmVersion:     "v2.0",
+		ConfigurationVersion: "v2.0",
+	}
+
+	// With nil dbtx, validation passes but BeginFunc will fail
+	_, err := repo.PersistValuation(context.Background(), valuation, nil)
+	if err == nil {
+		t.Error("expected error for nil dbtx")
+	}
+}
