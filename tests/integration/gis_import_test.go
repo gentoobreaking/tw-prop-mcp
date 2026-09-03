@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 	"github.com/jackc/pgx/v5"
@@ -65,13 +64,12 @@ func TestGISImport_Integration(t *testing.T) {
 	}
 
 	// Run migrations
-	if err := runMigrations(ctx, pool, hasPostGIS); err != nil {
+	if err := RunMigrations(ctx, pool, hasPostGIS); err != nil {
 		t.Fatalf("migrations: %v", err)
 	}
 
 	// Create querier
 	querier := db.New(pool)
-
 	if hasPostGIS {
 		// Test geometry engine with postgis
 		testGeometryEngineWithPostGIS(t, ctx, pool, querier)
@@ -85,86 +83,6 @@ func TestGISImport_Integration(t *testing.T) {
 	// Test import pipeline with sample geojson (doesn't require postgis for parsing)
 	testImportPipeline(t, ctx, pool)
 }
-
-func runMigrations(ctx context.Context, pool *pgxpool.Pool, hasPostGIS bool) error {
-	if hasPostGIS {
-		// Read migration files
-		migrationFiles := []string{
-			"../../migrations/000001_init.up.sql",
-			"../../migrations/000002_snapshot_lock.up.sql",
-		}
-		for _, f := range migrationFiles {
-			content, err := os.ReadFile(f)
-			if err != nil {
-				return err
-			}
-			if _, err := pool.Exec(ctx, string(content)); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// Minimal schema without postgis - only tables needed for import pipeline parsing tests
-	minimal := `
-	CREATE TABLE IF NOT EXISTS dataset_snapshot (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		source VARCHAR(50) NOT NULL,
-		source_version VARCHAR(50) NOT NULL,
-		downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-		file_name VARCHAR(255) NOT NULL,
-		file_sha256 CHAR(64) NOT NULL,
-		record_count BIGINT NOT NULL DEFAULT 0,
-		status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-		schema_version VARCHAR(20) NOT NULL DEFAULT 'v2.0',
-		UNIQUE (source, source_version, file_sha256)
-	);
-	CREATE TABLE IF NOT EXISTS import_batch (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		snapshot_id UUID NOT NULL REFERENCES dataset_snapshot(id) ON DELETE RESTRICT,
-		status VARCHAR(20) NOT NULL DEFAULT 'RUNNING',
-		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-	);
-	CREATE TABLE IF NOT EXISTS parcel_geometry (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		county VARCHAR(50) NOT NULL,
-		district VARCHAR(50) NOT NULL,
-		section VARCHAR(50) NOT NULL,
-		land_number VARCHAR(50) NOT NULL,
-		area_sqm NUMERIC(12,4),
-		urban_zoning VARCHAR(50),
-		land_use_category VARCHAR(50),
-		geometry TEXT, -- WKT without postgis
-		centroid TEXT,
-		bbox TEXT,
-		source VARCHAR(50) NOT NULL,
-		source_version VARCHAR(50) NOT NULL,
-		import_batch_id VARCHAR(100) NOT NULL,
-		snapshot_id UUID NOT NULL REFERENCES dataset_snapshot(id),
-		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-		UNIQUE (county, district, section, land_number, source_version)
-	);
-	CREATE TABLE IF NOT EXISTS road_segment (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		name VARCHAR(100),
-		road_class VARCHAR(50),
-		width NUMERIC(8,2),
-		geometry TEXT, -- WKT without postgis
-		import_batch_id VARCHAR(100) NOT NULL,
-		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-	);
-	`
-	if _, err := pool.Exec(ctx, minimal); err != nil {
-		return err
-	}
-	// pgcrypto for gen_random_uuid
-	if _, err := pool.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pgcrypto"); err != nil {
-		return err
-	}
-	return nil
-}
-
 func testGeometryEngineWithPostGIS(t *testing.T, ctx context.Context, pool *pgxpool.Pool, querier db.Querier) {
 	t.Run("ST_Intersects", func(t *testing.T) {
 		// Insert two overlapping polygons

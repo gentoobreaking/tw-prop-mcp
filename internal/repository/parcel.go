@@ -40,8 +40,9 @@ type ParcelRepository interface {
 	Search(ctx context.Context, filter ParcelFilter) ([]*domain.Parcel, error)
 	// GetGeometry4326 fetches the 4326-transformed WKT for a parcel (geometry, centroid, bbox)
 	GetGeometry4326(ctx context.Context, id string) (geom4326, centroid4326, bbox4326 string, err error)
+	// BatchInsert inserts parcels in batches using CopyFrom.
+	BatchInsert(ctx context.Context, parcels []domain.Parcel) (int64, error)
 }
-
 type parcelRepository struct {
 	queries *db.Queries
 	db      DBTX
@@ -498,6 +499,50 @@ func (r *parcelRepository) GetGeometry4326(ctx context.Context, id string) (stri
 		b = *bbox
 	}
 	return g, c, b, nil
+}
+
+// BatchInsert inserts parcels in batches using CopyFrom.
+func (r *parcelRepository) BatchInsert(ctx context.Context, parcels []domain.Parcel) (int64, error) {
+	if len(parcels) == 0 {
+		return 0, nil
+	}
+
+	batchSize := 256
+	var total int64
+
+	for i := 0; i < len(parcels); i += batchSize {
+		end := i + batchSize
+		if end > len(parcels) {
+			end = len(parcels)
+		}
+
+		batch := parcels[i:end]
+		count, err := r.batchInsertParcels(ctx, batch)
+		if err != nil {
+			return total, err
+		}
+		total += count
+	}
+
+	return total, nil
+}
+
+// batchInsertParcels inserts a single batch of parcels using COPY FROM.
+func (r *parcelRepository) batchInsertParcels(ctx context.Context, parcels []domain.Parcel) (int64, error) {
+	count, err := r.db.CopyFrom(
+		ctx,
+		pgx.Identifier{"parcel"},
+		[]string{"county", "district", "section", "land_number", "area_sqm", "urban_zoning", "land_use_category", "geometry", "centroid", "bbox", "source", "source_version", "import_batch_id"},
+		pgx.CopyFromSlice(len(parcels), func(i int) ([]any, error) {
+			p := parcels[i]
+			return []any{
+				p.County, p.District, p.Section, p.LandNumber, p.AreaSqm,
+				p.UrbanZoning, p.LandUseCategory, p.Geometry, p.Centroid, p.BBox,
+				p.Source, p.SourceVersion, p.ImportBatchID,
+			}, nil
+		}),
+	)
+	return count, err
 }
 
 func (r *parcelRepository) fetch4326ByLandNumber(ctx context.Context, county, district, section, landNumber string) (string, string, string, error) {

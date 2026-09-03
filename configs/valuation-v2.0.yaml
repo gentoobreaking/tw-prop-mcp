@@ -1,0 +1,14 @@
+version: "v2.0"
+description: "Valuation configuration v2.0 - defaults matching DB seed"
+area_similarity_pct: 30
+lambda: 0.05
+distance_scale: 500
+W_area: 0.30
+W_distance: 0.20
+W_time: 0.15
+W_zoning: 0.15
+W_land_use: 0.10
+W_road: 0.10
+IQR_k: 1.5
+minimum_required_comparables: 3
+outlier_method: "IQR"
