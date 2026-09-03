@@ -1,0 +1,27 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    image: tw-prop-mcp-postgres:16-alpine-postgis
+    container_name: tw-prop-mcp-postgres
+    environment:
+      POSTGRES_USER: prop
+      POSTGRES_PASSWORD: prop_dev_only
+      POSTGRES_DB: prop
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prop -d prop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
