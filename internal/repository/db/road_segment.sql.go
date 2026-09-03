@@ -12,6 +12,7 @@ import (
 )
 
 type BatchInsertRoadSegmentsParams struct {
+	ID            pgtype.UUID    `json:"id"`
 	Name          pgtype.Text    `json:"name"`
 	RoadClass     pgtype.Text    `json:"road_class"`
 	WidthM        pgtype.Numeric `json:"width_m"`
@@ -22,64 +23,47 @@ type BatchInsertRoadSegmentsParams struct {
 	ImportBatchID pgtype.UUID    `json:"import_batch_id"`
 }
 
-const findRoadsNearGeometry = `-- name: FindRoadsNearGeometry :many
-SELECT r.id, r.name, r.road_class, r.width_m, r.width_source, r.geometry, r.source, r.source_version, r.import_batch_id, r.created_at, ST_Distance(r.geometry, ST_GeomFromText($1, 3826)) AS distance_m
-FROM road_segment r
-WHERE ST_DWithin(r.geometry, ST_GeomFromText($1, 3826), $2)
-ORDER BY distance_m ASC
-LIMIT $3
+const createRoadSegment = `-- name: CreateRoadSegment :one
+INSERT INTO road_segment (name, road_class, width_m, width_source, geometry, source, source_version, import_batch_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, road_class, width_m, width_source, geometry, source, source_version, import_batch_id, created_at
 `
 
-type FindRoadsNearGeometryParams struct {
-	StGeomfromtext interface{} `json:"st_geomfromtext"`
-	StDwithin      interface{} `json:"st_dwithin"`
-	Limit          int32       `json:"limit"`
+type CreateRoadSegmentParams struct {
+	Name          pgtype.Text    `json:"name"`
+	RoadClass     pgtype.Text    `json:"road_class"`
+	WidthM        pgtype.Numeric `json:"width_m"`
+	WidthSource   string         `json:"width_source"`
+	Geometry      string         `json:"geometry"`
+	Source        string         `json:"source"`
+	SourceVersion string         `json:"source_version"`
+	ImportBatchID pgtype.UUID    `json:"import_batch_id"`
 }
 
-type FindRoadsNearGeometryRow struct {
-	ID            pgtype.UUID        `json:"id"`
-	Name          pgtype.Text        `json:"name"`
-	RoadClass     pgtype.Text        `json:"road_class"`
-	WidthM        pgtype.Numeric     `json:"width_m"`
-	WidthSource   string             `json:"width_source"`
-	Geometry      string             `json:"geometry"`
-	Source        string             `json:"source"`
-	SourceVersion string             `json:"source_version"`
-	ImportBatchID pgtype.UUID        `json:"import_batch_id"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	DistanceM     interface{}        `json:"distance_m"`
-}
-
-func (q *Queries) FindRoadsNearGeometry(ctx context.Context, arg FindRoadsNearGeometryParams) ([]FindRoadsNearGeometryRow, error) {
-	rows, err := q.db.Query(ctx, findRoadsNearGeometry, arg.StGeomfromtext, arg.StDwithin, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []FindRoadsNearGeometryRow
-	for rows.Next() {
-		var i FindRoadsNearGeometryRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.RoadClass,
-			&i.WidthM,
-			&i.WidthSource,
-			&i.Geometry,
-			&i.Source,
-			&i.SourceVersion,
-			&i.ImportBatchID,
-			&i.CreatedAt,
-			&i.DistanceM,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) CreateRoadSegment(ctx context.Context, arg CreateRoadSegmentParams) (RoadSegment, error) {
+	row := q.db.QueryRow(ctx, createRoadSegment,
+		arg.Name,
+		arg.RoadClass,
+		arg.WidthM,
+		arg.WidthSource,
+		arg.Geometry,
+		arg.Source,
+		arg.SourceVersion,
+		arg.ImportBatchID,
+	)
+	var i RoadSegment
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.RoadClass,
+		&i.WidthM,
+		&i.WidthSource,
+		&i.Geometry,
+		&i.Source,
+		&i.SourceVersion,
+		&i.ImportBatchID,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getRoadSegmentByID = `-- name: GetRoadSegmentByID :one
@@ -104,31 +88,52 @@ func (q *Queries) GetRoadSegmentByID(ctx context.Context, id pgtype.UUID) (RoadS
 	return i, err
 }
 
-const searchRoadSegments = `-- name: SearchRoadSegments :many
-SELECT id, name, road_class, width_m, width_source, geometry, source, source_version, import_batch_id, created_at FROM road_segment
-WHERE ($1::text IS NULL OR name ILIKE '%' || $1 || '%')
-  AND ($2::text IS NULL OR road_class = $2)
-  AND ($3::text IS NULL OR source = $3)
-ORDER BY name
-LIMIT $4 OFFSET $5
+const getRoadSegmentsByName = `-- name: GetRoadSegmentsByName :many
+SELECT id, name, road_class, width_m, width_source, geometry, source, source_version, import_batch_id, created_at FROM road_segment WHERE name ILIKE '%' || $1 || '%' LIMIT 50
 `
 
-type SearchRoadSegmentsParams struct {
-	Column1 string `json:"column_1"`
-	Column2 string `json:"column_2"`
-	Column3 string `json:"column_3"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+func (q *Queries) GetRoadSegmentsByName(ctx context.Context, dollar_1 pgtype.Text) ([]RoadSegment, error) {
+	rows, err := q.db.Query(ctx, getRoadSegmentsByName, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RoadSegment
+	for rows.Next() {
+		var i RoadSegment
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.RoadClass,
+			&i.WidthM,
+			&i.WidthSource,
+			&i.Geometry,
+			&i.Source,
+			&i.SourceVersion,
+			&i.ImportBatchID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func (q *Queries) SearchRoadSegments(ctx context.Context, arg SearchRoadSegmentsParams) ([]RoadSegment, error) {
-	rows, err := q.db.Query(ctx, searchRoadSegments,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Limit,
-		arg.Offset,
-	)
+const listRoadSegments = `-- name: ListRoadSegments :many
+SELECT id, name, road_class, width_m, width_source, geometry, source, source_version, import_batch_id, created_at FROM road_segment ORDER BY created_at DESC LIMIT $1 OFFSET $2
+`
+
+type ListRoadSegmentsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListRoadSegments(ctx context.Context, arg ListRoadSegmentsParams) ([]RoadSegment, error) {
+	rows, err := q.db.Query(ctx, listRoadSegments, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

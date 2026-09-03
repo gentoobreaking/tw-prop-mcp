@@ -33,11 +33,15 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool, hasPostGIS bool) err
 		source VARCHAR(50) NOT NULL,
 		source_version VARCHAR(50) NOT NULL,
 		downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		published_at TIMESTAMPTZ,
 		file_name VARCHAR(255) NOT NULL,
 		file_sha256 CHAR(64) NOT NULL,
 		record_count BIGINT NOT NULL DEFAULT 0,
 		status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
 		schema_version VARCHAR(20) NOT NULL DEFAULT 'v2.0',
+		import_started_at TIMESTAMPTZ,
+		import_completed_at TIMESTAMPTZ,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		UNIQUE (source, source_version, file_sha256)
 	);
 	CREATE TABLE IF NOT EXISTS import_batch (

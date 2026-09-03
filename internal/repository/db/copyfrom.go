@@ -9,6 +9,45 @@ import (
 	"context"
 )
 
+// iteratorForBatchInsertParcelRoadAccess implements pgx.CopyFromSource.
+type iteratorForBatchInsertParcelRoadAccess struct {
+	rows                 []BatchInsertParcelRoadAccessParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForBatchInsertParcelRoadAccess) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForBatchInsertParcelRoadAccess) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].ParcelID,
+		r.rows[0].RoadID,
+		r.rows[0].DistanceM,
+		r.rows[0].NearestPoint,
+		r.rows[0].RoadWidthM,
+		r.rows[0].AccessType,
+		r.rows[0].Source,
+		r.rows[0].AlgorithmVersion,
+	}, nil
+}
+
+func (r iteratorForBatchInsertParcelRoadAccess) Err() error {
+	return nil
+}
+
+func (q *Queries) BatchInsertParcelRoadAccess(ctx context.Context, arg []BatchInsertParcelRoadAccessParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"parcel_road_access"}, []string{"parcel_id", "road_id", "distance_m", "nearest_point", "road_width_m", "access_type", "source", "algorithm_version"}, &iteratorForBatchInsertParcelRoadAccess{rows: arg})
+}
+
 // iteratorForBatchInsertParcels implements pgx.CopyFromSource.
 type iteratorForBatchInsertParcels struct {
 	rows                 []BatchInsertParcelsParams
@@ -73,6 +112,7 @@ func (r *iteratorForBatchInsertRoadSegments) Next() bool {
 
 func (r iteratorForBatchInsertRoadSegments) Values() ([]interface{}, error) {
 	return []interface{}{
+		r.rows[0].ID,
 		r.rows[0].Name,
 		r.rows[0].RoadClass,
 		r.rows[0].WidthM,
@@ -89,7 +129,7 @@ func (r iteratorForBatchInsertRoadSegments) Err() error {
 }
 
 func (q *Queries) BatchInsertRoadSegments(ctx context.Context, arg []BatchInsertRoadSegmentsParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"road_segment"}, []string{"name", "road_class", "width_m", "width_source", "geometry", "source", "source_version", "import_batch_id"}, &iteratorForBatchInsertRoadSegments{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"road_segment"}, []string{"id", "name", "road_class", "width_m", "width_source", "geometry", "source", "source_version", "import_batch_id"}, &iteratorForBatchInsertRoadSegments{rows: arg})
 }
 
 // iteratorForBatchInsertTransactions implements pgx.CopyFromSource.

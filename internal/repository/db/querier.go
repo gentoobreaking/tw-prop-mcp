@@ -11,21 +11,27 @@ import (
 )
 
 type Querier interface {
+	BatchInsertParcelRoadAccess(ctx context.Context, arg []BatchInsertParcelRoadAccessParams) (int64, error)
 	BatchInsertParcels(ctx context.Context, arg []BatchInsertParcelsParams) (int64, error)
 	BatchInsertRoadSegments(ctx context.Context, arg []BatchInsertRoadSegmentsParams) (int64, error)
 	BatchInsertTransactions(ctx context.Context, arg []BatchInsertTransactionsParams) (int64, error)
 	CheckRoadAccess(ctx context.Context, arg CheckRoadAccessParams) (ParcelRoadAccess, error)
 	CompleteImportBatch(ctx context.Context, arg CompleteImportBatchParams) error
 	CreateImportBatch(ctx context.Context, snapshotID pgtype.UUID) (ImportBatch, error)
+	CreateParcelRoadAccess(ctx context.Context, arg CreateParcelRoadAccessParams) (ParcelRoadAccess, error)
+	CreateRoadSegment(ctx context.Context, arg CreateRoadSegmentParams) (RoadSegment, error)
 	CreateSnapshot(ctx context.Context, arg CreateSnapshotParams) (DatasetSnapshot, error)
+	DeleteParcelRoadAccess(ctx context.Context, id pgtype.UUID) error
 	FindNearbyRoads(ctx context.Context, arg FindNearbyRoadsParams) ([]FindNearbyRoadsRow, error)
-	FindRoadsNearGeometry(ctx context.Context, arg FindRoadsNearGeometryParams) ([]FindRoadsNearGeometryRow, error)
 	GetAlgorithmVersion(ctx context.Context, version string) (AlgorithmVersion, error)
 	GetConfig(ctx context.Context, version string) (ConfigurationSnapshot, error)
 	GetParcelByID(ctx context.Context, id pgtype.UUID) (Parcel, error)
 	GetParcelByLandNumber(ctx context.Context, arg GetParcelByLandNumberParams) (Parcel, error)
 	GetParcelGeometry(ctx context.Context, id pgtype.UUID) (GetParcelGeometryRow, error)
+	GetParcelRoadAccessByID(ctx context.Context, id pgtype.UUID) (ParcelRoadAccess, error)
+	GetParcelRoadAccessByParcelID(ctx context.Context, parcelID pgtype.UUID) (ParcelRoadAccess, error)
 	GetRoadSegmentByID(ctx context.Context, id pgtype.UUID) (RoadSegment, error)
+	GetRoadSegmentsByName(ctx context.Context, dollar_1 pgtype.Text) ([]RoadSegment, error)
 	GetSnapshotByID(ctx context.Context, id pgtype.UUID) (DatasetSnapshot, error)
 	GetTransactionByID(ctx context.Context, id pgtype.UUID) (Transaction, error)
 	// percentile_cont for total_price (p25/p50/p75) and area medians by county/district/section.
@@ -35,10 +41,11 @@ type Querier interface {
 	InsertComparableResult(ctx context.Context, arg InsertComparableResultParams) (ComparableResult, error)
 	InsertValuationResult(ctx context.Context, arg InsertValuationResultParams) (ValuationResult, error)
 	ListComparableResults(ctx context.Context, arg ListComparableResultsParams) ([]ComparableResult, error)
+	ListParcelRoadAccess(ctx context.Context, arg ListParcelRoadAccessParams) ([]ParcelRoadAccess, error)
+	ListRoadSegments(ctx context.Context, arg ListRoadSegmentsParams) ([]RoadSegment, error)
 	ListSnapshots(ctx context.Context) ([]DatasetSnapshot, error)
 	LockSnapshot(ctx context.Context, id pgtype.UUID) error
 	SearchParcels(ctx context.Context, arg SearchParcelsParams) ([]Parcel, error)
-	SearchRoadSegments(ctx context.Context, arg SearchRoadSegmentsParams) ([]RoadSegment, error)
 	SearchTransactions(ctx context.Context, arg SearchTransactionsParams) ([]Transaction, error)
 }
 
