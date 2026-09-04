@@ -19,9 +19,7 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
 /**
  * Load Google Maps with automatic retry and exponential backoff.
  */
-export async function loadGoogleMapsWithRetry(
-  options: RetryOptions = {},
-): Promise<typeof google> {
+export async function loadGoogleMapsWithRetry(options: RetryOptions = {}): Promise<typeof google> {
   const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
   let delay = opts.initialDelayMs;
   let lastError: Error | null = null;

@@ -110,8 +110,7 @@ func TestImportPipeline_Integration(t *testing.T) {
 	}, nil)
 
 	p.SetRepositories(txRepo, parcelRepo, snapshotRepo)
-
-	// Run import
+	p.DB = pool
 	result, err := p.ImportFromSource(ctx)
 	if err != nil {
 		t.Fatalf("import failed: %v", err)

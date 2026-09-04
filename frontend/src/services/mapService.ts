@@ -63,31 +63,27 @@ export function parcelGeometryToPaths(parcel: ParcelGeometry): LatLng[][] {
 
 /** Extract marker positions from transactions */
 export function transactionsToMarkers(transactions: Transaction[]): LatLng[] {
-  return transactions
-    .filter((t) => t.location)
-    .map((t) => t.location!);
+  return transactions.filter((t) => t.location).map((t) => t.location!);
 }
 
 /** Extract road paths from road segments */
 export function roadsToPaths(roads: RoadSegment[]): LatLng[][] {
-  return roads
-    .filter((r) => r.geometry)
-    .flatMap((r) => multiLineStringToPaths(r.geometry));
+  return roads.filter((r) => r.geometry).flatMap((r) => multiLineStringToPaths(r.geometry));
 }
 
 /** Extract comparable marker positions */
 export function comparablesToMarkers(comps: ComparableResult[]): LatLng[] {
-  return comps
-    .filter((c) => c.transaction?.location)
-    .map((c) => c.transaction.location!);
+  return comps.filter((c) => c.transaction?.location).map((c) => c.transaction.location!);
 }
 
 /** Compute bounds that encompass all given lat/lng points */
 export function computeUnionBounds(points: LatLng[]): LatLngBounds | null {
   if (points.length === 0) return null;
 
-  let minLat = Infinity, maxLat = -Infinity;
-  let minLng = Infinity, maxLng = -Infinity;
+  let minLat = Infinity,
+    maxLat = -Infinity;
+  let minLng = Infinity,
+    maxLng = -Infinity;
 
   for (const p of points) {
     minLat = Math.min(minLat, p.lat);

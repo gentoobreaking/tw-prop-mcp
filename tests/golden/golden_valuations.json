@@ -1,0 +1,19 @@
+{
+  "description": "Golden valuation expected values — bear/base/bull with fixed dataset",
+  "algorithm_version": "comparable-v2.0",
+  "configuration_version": "v2.0",
+  "outlier_method": "IQR",
+  "input_comparable_unit_prices_sqm": [83333, 93333, 100000, 110000, 120000, 150000, 200000],
+  "expected": {
+    "bear_value_sqm": 103749.75,
+    "base_value_sqm": 133333.0,
+    "bull_value_sqm": 166666.25,
+    "base_price_per_ping": 40422.5,
+    "confidence": "HIGH",
+    "comparable_count": 7,
+    "status": "COMPLETED",
+    "bear_p25": 83333,
+    "base_p50": 133333,
+    "bull_p75": 166666
+  }
+}

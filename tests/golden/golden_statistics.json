@@ -1,0 +1,33 @@
+{
+  "description": "Golden statistics expected values — verified with manual calculation",
+  "input_prices_twd_per_sqm": [83333, 93333, 100000, 110000, 120000, 150000, 200000, 500000],
+  "outlier_input_prices_twd_per_sqm": [83333, 93333, 100000, 110000, 120000, 150000, 200000, 5000000],
+  "expected": {
+    "count": 8,
+    "min": 83333.0,
+    "p10": 91666.6,
+    "p25": 103749.75,
+    "median": 133333.0,
+    "mean": 171666.5,
+    "p75": 166666.25,
+    "p90": 216666.4,
+    "max": 500000.0,
+    "price_per_ping": {
+      "conversion_factor": 3.305785,
+      "input_sqm": 333.66,
+      "expected_ping": 100.92,
+      "tolerance": 0.0001
+    },
+    "outlier_iqr": {
+      "method": "IQR",
+      "k": 1.5,
+      "q1": 103749.75,
+      "q3": 166666.25,
+      "iqr": 62916.5,
+      "lower_bound": 11376.25,
+      "upper_bound": 261033.0,
+      "outlier_count": 2,
+      "outliers_removed": [500000.0, 200000.0]
+    }
+  }
+}

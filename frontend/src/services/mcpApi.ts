@@ -95,16 +95,25 @@ export async function getParcelGeometry(params: {
   district: string;
   section: string;
   landNumber: string;
-}): Promise<{ geometry: unknown; centroid: LatLng; bbox: unknown; area_sqm: number; metadata: unknown }> {
-  return callMCP<{ geometry: unknown; centroid: LatLng; bbox: unknown; area_sqm: number; metadata: unknown }>(
-    'get_parcel_geometry',
-    {
-      county: params.county,
-      district: params.district,
-      section: params.section,
-      land_number: params.landNumber,
-    },
-  );
+}): Promise<{
+  geometry: unknown;
+  centroid: LatLng;
+  bbox: unknown;
+  area_sqm: number;
+  metadata: unknown;
+}> {
+  return callMCP<{
+    geometry: unknown;
+    centroid: LatLng;
+    bbox: unknown;
+    area_sqm: number;
+    metadata: unknown;
+  }>('get_parcel_geometry', {
+    county: params.county,
+    district: params.district,
+    section: params.section,
+    land_number: params.landNumber,
+  });
 }
 
 export async function getMapContext(params: {
@@ -136,13 +145,17 @@ export async function findComparables(params: {
   });
 }
 
-export async function estimateLandValue(parcelId: string): Promise<{ valuation: unknown; metadata: unknown }> {
+export async function estimateLandValue(
+  parcelId: string,
+): Promise<{ valuation: unknown; metadata: unknown }> {
   return callMCP<{ valuation: unknown; metadata: unknown }>('estimate_land_value', {
     parcel_id: parcelId,
   });
 }
 
-export async function checkRoadAccess(parcelId: string): Promise<{ road_access: unknown[]; metadata: unknown }> {
+export async function checkRoadAccess(
+  parcelId: string,
+): Promise<{ road_access: unknown[]; metadata: unknown }> {
   return callMCP<{ road_access: unknown[]; metadata: unknown }>('check_road_access', {
     parcel_id: parcelId,
   });
@@ -155,31 +168,25 @@ export async function loadMapView(params: {
   landNumber: string;
 }): Promise<ViewData> {
   // First, fetch the parcel to obtain its UUID — required as input for
-	// check_road_access, find_comparable_transactions, and estimate_land_value.
-	const parcel = await getParcel(params);
-	const parcelId = parcel.parcel_id ?? parcel.id ?? '';
+  // check_road_access, find_comparable_transactions, and estimate_land_value.
+  const parcel = await getParcel(params);
+  const parcelId = parcel.parcel_id ?? parcel.id ?? '';
 
-  const [
-    parcelResp,
-    transactionsResp,
-    roadsResp,
-    comparablesResp,
-    valuationResp,
-    mapContextResp,
-  ] = await Promise.allSettled([
-    getParcelGeometry(params),
-    searchTransactions({
-      county: params.county,
-      district: params.district,
-      section: params.section,
-      landNumber: params.landNumber,
-      limit: 50,
-    }),
-    checkRoadAccess(parcelId),
-    findComparables({ parcelId }),
-    estimateLandValue(parcelId),
-    getMapContext(params),
-  ]);
+  const [parcelResp, transactionsResp, roadsResp, comparablesResp, valuationResp, mapContextResp] =
+    await Promise.allSettled([
+      getParcelGeometry(params),
+      searchTransactions({
+        county: params.county,
+        district: params.district,
+        section: params.section,
+        landNumber: params.landNumber,
+        limit: 50,
+      }),
+      checkRoadAccess(parcelId),
+      findComparables({ parcelId }),
+      estimateLandValue(parcelId),
+      getMapContext(params),
+    ]);
 
   // Build ViewData with type-safe extraction
   const metadata =

@@ -20,7 +20,7 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
   if (!valuation) {
     return (
       <div className="valuation-panel">
-        <h3>Valuation</h3>        <p className="no-data">No valuation data available</p>
+        <h3>Valuation</h3> <p className="no-data">No valuation data available</p>
       </div>
     );
   }
@@ -63,7 +63,9 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
         <div>Algorithm: {valuation.algorithm_version}</div>
         <div>Config: {valuation.configuration_version}</div>
         <div>Comparables: {valuation.comparable_count}</div>
-        <div>Query Hash: <code>{metadata.query_hash.slice(0, 16)}…</code></div>
+        <div>
+          Query Hash: <code>{metadata.query_hash.slice(0, 16)}…</code>
+        </div>
       </div>
 
       {comparables.length > 0 && (
@@ -76,9 +78,7 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
                 <div>
                   {c.transaction.county} {c.transaction.district}
                 </div>
-                <div className="price">
-                  NT$ {c.transaction.total_price.toLocaleString()}
-                </div>
+                <div className="price">NT$ {c.transaction.total_price.toLocaleString()}</div>
                 <div className="distance">{c.distance_m.toFixed(0)} m</div>
               </div>
             </div>

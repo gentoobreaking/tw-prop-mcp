@@ -17,6 +17,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"tw-prop-mcp/internal/domain"
 	"tw-prop-mcp/internal/downloader"
 	"tw-prop-mcp/internal/mcp"
@@ -88,6 +90,7 @@ type ImportPipeline struct {
 	Status       ImportPipelineStatus
 	CurrentStage string
 	Logger       *slog.Logger
+	DB           *pgxpool.Pool // Required for transactional imports
 }
 
 // NewImportPipeline creates a new ImportPipeline with default components.
@@ -122,6 +125,11 @@ func (p *ImportPipeline) SetRepositories(
 	p.TxRepo = txRepo
 	p.ParcelRepo = parcelRepo
 	p.SnapshotRepo = snapshotRepo
+}
+
+// SetDB sets the database connection pool (required for transactional imports).
+func (p *ImportPipeline) SetDB(db *pgxpool.Pool) {
+	p.DB = db
 }
 
 // ImportFromSource executes the complete import pipeline.
@@ -203,11 +211,7 @@ func (p *ImportPipeline) ImportFromSource(ctx context.Context) (ImportResult, er
 	result.TransactionsImported = len(dedupedTxns)
 	result.ParcelsImported = len(dedupedParcels)
 
-	// Stage 8: Lock snapshot
-	if err := p.lockSnapshot(ctx); err != nil {
-		p.setStatus(StatusFailed)
-		return result, p.wrapError("lock_snapshot", err)
-	}
+	// Snapshot locked atomically within importData transaction — no separate lock needed
 
 	p.setStatus(StatusLocked)
 	result.Duration = time.Since(start)
@@ -454,18 +458,39 @@ func (p *ImportPipeline) deduplicate(transactions []domain.Transaction, parcels 
 	return dedupedTxns, dedupedParcels
 }
 
-// importData inserts data into the database.
+// importData inserts data into the database within a single transaction.
+// Spec §62: BEGIN → load → validate → reconcile → COMMIT → LOCK.
+// If any step fails, ROLLBACK ensures no partial data remains.
 func (p *ImportPipeline) importData(ctx context.Context, transactions []domain.Transaction, parcels []domain.Parcel, importBatchID string) error {
 	if p.TxRepo == nil || p.ParcelRepo == nil {
 		return errors.New("repositories not set")
 	}
+	if p.DB == nil {
+		return errors.New("database connection not set — required for transactional import")
+	}
+
+	// BEGIN transaction — spec §62
+	tx, err := p.DB.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+
+	// Create transactional repository instances
+	txRepo := repository.NewTransactionRepository(tx)
+	parcelRepo := repository.ParcelRepository(repository.NewParcelRepository(tx))
+	snapshotRepo := repository.NewSnapshotRepository(tx)
+
+	// Defer rollback — only commits if we return nil before this fires
+	defer func() {
+		_ = tx.Rollback(ctx) // no-op if already committed
+	}()
 
 	// Import transactions
 	if len(transactions) > 0 {
 		for i := range transactions {
 			transactions[i].ImportBatchID = importBatchID
 		}
-		inserted, err := p.TxRepo.BatchInsert(ctx, transactions)
+		inserted, err := txRepo.BatchInsert(ctx, transactions)
 		if err != nil {
 			return fmt.Errorf("batch insert transactions: %w", err)
 		}
@@ -474,17 +499,29 @@ func (p *ImportPipeline) importData(ctx context.Context, transactions []domain.T
 
 	// Import parcels
 	if len(parcels) > 0 {
-		inserted, err := p.ParcelRepo.BatchInsert(ctx, parcels)
+		inserted, err := parcelRepo.BatchInsert(ctx, parcels)
 		if err != nil {
 			return fmt.Errorf("batch insert parcels: %w", err)
 		}
 		p.Logger.Info("parcels inserted", "count", inserted)
 	}
 
+	// Lock snapshot within the same transaction — spec §62: COMMIT → LOCK
+	if err := snapshotRepo.Lock(ctx, p.Config.SnapshotID); err != nil {
+		return fmt.Errorf("lock snapshot: %w", err)
+	}
+	mcp.IncSnapshotLocked()
+
+	// COMMIT — all operations succeeded
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+
 	return nil
 }
 
-// lockSnapshot transitions the snapshot to LOCKED status.
+// lockSnapshot transitions the snapshot to LOCKED status (no-op when
+// called after importData, which locks atomically within the transaction).
 func (p *ImportPipeline) lockSnapshot(ctx context.Context) error {
 	if p.SnapshotRepo == nil {
 		return errors.New("snapshot repository not set")

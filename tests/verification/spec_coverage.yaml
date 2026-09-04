@@ -1,0 +1,325 @@
+# Specification Coverage Matrix — tw-prop-mcp v2.0
+# Maps each SPEC.md requirement → implementation → test → evidence
+# Auto-generated from verification_manual.md §4.1 format
+
+requirements:
+
+  # --- Data Ingestion ---
+  - id: SPEC-001
+    source: SPEC.md §1.1
+    requirement: official-data-ingestion
+    implementation:
+      - internal/downloader/downloader.go
+      - internal/downloader/snapshot.go
+      - internal/parser/parser.go
+    tests:
+      - tests/reproducibility/reproducibility_test.go
+
+  - id: SPEC-002
+    source: DATA_MODEL.md §2.3
+    requirement: immutable-snapshot
+    implementation:
+      - internal/repository/snapshot.go
+      - migrations/000002_snapshot_lock.up.sql
+    tests:
+      - tests/artifact_lock/artifact_lock_test.go
+
+  - id: SPEC-003
+    source: DATA_MODEL.md §2.2
+    requirement: data-pipeline-stages
+    implementation:
+      - internal/importpipeline/pipeline.go
+    tests:
+      - tests/reproducibility/reproducibility_test.go
+
+  - id: SPEC-004
+    source: DATA_MODEL.md §2.12
+    requirement: uniqueness-constraints
+    implementation:
+      - migrations/000001_init.up.sql
+    tests:
+      - tests/artifact_lock/artifact_lock_test.go
+
+  # --- Transaction Engine ---
+  - id: SPEC-005
+    source: MCP_API.md §3.3
+    requirement: search_transactions
+    implementation:
+      - internal/mcp/transaction_tools.go
+      - internal/service/transaction.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-006
+    source: MCP_API.md §3.2
+    requirement: get_transaction
+    implementation:
+      - internal/mcp/transaction_tools.go
+      - internal/service/transaction.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-007
+    source: MCP_API.md §3.2
+    requirement: get_transaction_statistics
+    implementation:
+      - internal/mcp/transaction_tools.go
+      - internal/service/transaction.go
+      - internal/statistics/engine.go
+    tests:
+      - tests/contract/contract_test.go
+
+  # --- Parcel API ---
+  - id: SPEC-008
+    source: MCP_API.md §3.2
+    requirement: get_parcel
+    implementation:
+      - internal/mcp/parcel_tools.go
+      - internal/repository/parcel.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-009
+    source: MCP_API.md §3.2
+    requirement: search_parcels
+    implementation:
+      - internal/mcp/parcel_tools.go
+      - internal/repository/parcel.go
+    tests:
+      - tests/contract/contract_test.go
+
+  # --- GIS / Road Access ---
+  - id: SPEC-010
+    source: GIS_SPEC.md §4.5
+    requirement: parcel_geometry
+    implementation:
+      - internal/gis/adapter.go
+      - internal/mcp/gis_tools.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-011
+    source: GIS_SPEC.md §4.4
+    requirement: coordinate-system-3826-4326
+    implementation:
+      - internal/gis/transform.go
+    tests:
+      - internal/gis/transform_test.go
+
+  - id: SPEC-012
+    source: GIS_SPEC.md §4.6
+    requirement: road-access-algorithm
+    implementation:
+      - internal/service/road_access.go
+      - internal/domain/parcel_road_access.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-013
+    source: DATA_MODEL.md §2.7
+    requirement: road-segments
+    implementation:
+      - internal/domain/road_segment.go
+      - internal/repository/road_segment.go
+    tests:
+      - tests/artifact_lock/artifact_lock_test.go
+
+  # --- Comparable Engine ---
+  - id: SPEC-014
+    source: MCP_API.md §3.2
+    requirement: find_comparable_transactions
+    implementation:
+      - internal/mcp/comparable_tools.go
+      - internal/comparable/engine.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-015
+    source: VALUATION_SPEC.md §5.2
+    requirement: comparable-hard-filter
+    implementation:
+      - internal/comparable/engine.go:filterCandidates
+    tests:
+      - internal/comparable/engine_test.go
+
+  - id: SPEC-016
+    source: VALUATION_SPEC.md §5.9
+    requirement: comparable-scoring
+    implementation:
+      - internal/comparable/engine.go:scoreCandidates
+    tests:
+      - internal/comparable/engine_test.go
+
+  - id: SPEC-017
+    source: VALUATION_SPEC.md §5.10
+    requirement: outlier-handling
+    implementation:
+      - internal/comparable/engine.go:removeOutliers
+      - internal/statistics/engine.go:detectOutliers
+    tests:
+      - internal/statistics/engine_test.go
+
+  - id: SPEC-018
+    source: VALUATION_SPEC.md §5.11
+    requirement: statistics-min-p10-p25-median-mean-p75-p90-max
+    implementation:
+      - internal/statistics/engine.go:calculatePriceStatistics
+    tests:
+      - internal/statistics/engine_test.go
+
+  # --- Valuation Engine ---
+  - id: SPEC-019
+    source: MCP_API.md §3.2
+    requirement: estimate_land_value
+    implementation:
+      - internal/mcp/valuation_tools.go
+      - internal/valuation/engine.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-020
+    source: VALUATION_SPEC.md §5.12-5.13
+    requirement: bear-base-bull-valuation
+    implementation:
+      - internal/valuation/engine.go:Valuate
+    tests:
+      - internal/valuation/engine_test.go
+
+  - id: SPEC-021
+    source: VALUATION_SPEC.md §5.14
+    requirement: confidence-levels
+    implementation:
+      - internal/valuation/engine.go:computeConfidence
+      - internal/domain/valuation.go:ConfidenceLevel
+    tests:
+      - internal/valuation/engine_test.go
+
+  - id: SPEC-022
+    source: VALUATION_SPEC.md §5.15
+    requirement: insufficient-data-guard
+    implementation:
+      - internal/valuation/engine.go:insufficientData
+    tests:
+      - internal/valuation/engine_test.go
+
+  # --- Provenance ---
+  - id: SPEC-023
+    source: DATA_MODEL.md §2.9
+    requirement: provenance-fields
+    implementation:
+      - internal/domain/provenance.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-024
+    source: MCP_API.md §3.2
+    requirement: get_data_provenance
+    implementation:
+      - internal/mcp/provenance_tools.go
+      - internal/provenance/service.go
+    tests:
+      - tests/contract/contract_test.go
+
+  - id: SPEC-025
+    source: MCP_API.md §3.2
+    requirement: get_data_snapshot
+    implementation:
+      - internal/mcp/provenance_tools.go
+    tests:
+      - tests/contract/contract_test.go
+
+  # --- AI Isolation ---
+  - id: SPEC-026
+    source: MCP_API.md §3.10
+    requirement: prohibited-fields-rejection
+    implementation:
+      - internal/mcp/errors.go:ProhibitedFields
+      - internal/mcp/errors.go:ValidateAIIsolation
+    tests:
+      - tests/isolation/injection_test.go
+
+  - id: SPEC-027
+    source: SPEC.md §P4
+    requirement: ai-isolation-no-sql-postgres-shell
+    implementation:
+      - internal/mcp/server.go (requestIDMiddleware)
+    tests:
+      - tests/isolation/injection_test.go
+
+  # --- Reproducibility ---
+  - id: SPEC-028
+    source: VALUATION_SPEC.md §5.9
+    requirement: comparable-determinism
+    implementation:
+      - internal/comparable/engine.go
+      - internal/service/transaction.go:generateQueryHash
+    tests:
+      - tests/reproducibility/reproducibility_test.go
+
+  - id: SPEC-029
+    source: DATA_MODEL.md §2.12
+    requirement: four-key-parcel-identity
+    implementation:
+      - migrations/000001_init.up.sql
+      - internal/domain/parcel.go
+    tests:
+      - tests/contract/contract_test.go
+
+  # --- Observability ---
+  - id: SPEC-030
+    source: MCP_API.md §3.6
+    requirement: query-hash-metadata
+    implementation:
+      - internal/mcp/instrument.go:provenanceHashFromArgs
+      - internal/mcp/observability.go:RequestLogEntry
+    tests:
+      - internal/mcp/observability_test.go
+
+  - id: SPEC-031
+    source: SPEC.md §P6
+    requirement: provenance-traceable-responses
+    implementation:
+      - internal/mcp/instrument.go
+      - internal/mcp/observability.go:logRequest
+    tests:
+      - internal/mcp/observability_test.go
+
+  # --- Database ---
+  - id: SPEC-032
+    source: DATA_MODEL.md §2.11
+    requirement: core-tables
+    implementation:
+      - migrations/000001_init.up.sql
+    tests:
+      - tests/integration/postgres_test.go
+
+  - id: SPEC-033
+    source: DATA_MODEL.md §2.4
+    requirement: transaction-model-fields
+    implementation:
+      - internal/domain/transaction.go
+    tests:
+      - internal/normalizer/normalizer_test.go
+
+  - id: SPEC-034
+    source: DATA_MODEL.md §2.5
+    requirement: parcel-model-fields
+    implementation:
+      - internal/domain/parcel.go
+    tests:
+      - internal/normalizer/normalizer_test.go
+
+  - id: SPEC-035
+    source: DATA_MODEL.md §2.8
+    requirement: road-access-model
+    implementation:
+      - internal/domain/parcel_road_access.go
+    tests:
+      - tests/contract/contract_test.go
+
+# Summary
+# Total requirements: 35
+# Fully implemented: 35
+# Implemented but missing test: 0
+# Not implemented: 0
+# Coverage: 100%

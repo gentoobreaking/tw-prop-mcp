@@ -11,11 +11,7 @@ interface ComparableLayerProps {
  * Renders comparable transactions as distinct markers on the map.
  * Colored differently from regular transactions.
  */
-export const ComparableLayer: React.FC<ComparableLayerProps> = ({
-  google,
-  map,
-  comparables,
-}) => {
+export const ComparableLayer: React.FC<ComparableLayerProps> = ({ google, map, comparables }) => {
   React.useEffect(() => {
     if (!comparables.length || !google || !map) return;
 

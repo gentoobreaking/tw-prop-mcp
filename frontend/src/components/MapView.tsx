@@ -1,7 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { useMap } from '../hooks/useMap';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
-import type { ParcelGeometry, Transaction, RoadSegment, ComparableResult, MapContext, ResponseMetadata } from '../types';
+import type {
+  ParcelGeometry,
+  Transaction,
+  RoadSegment,
+  ComparableResult,
+  MapContext,
+  ResponseMetadata,
+} from '../types';
 import './MapView.css';
 
 interface MapViewProps {

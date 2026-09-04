@@ -1,0 +1,49 @@
+{
+  "description": "Golden dataset for regression testing — tw-prop-mcp v2.0",
+  "generated_at": "2026-09-04T00:00:00Z",
+  "snapshot_id": "golden-test-snapshot",
+  "algorithm_version": "comparable-v2.0",
+  "configuration_version": "v2.0",
+  "transactions": [
+    {
+      "transaction_id": "txn-golden-001",
+      "county": "澎湖縣",
+      "district": "西嶼鄉",
+      "section": "竹篙灣段",
+      "land_number": "3615",
+      "transaction_type": "買賣",
+      "transaction_date": "2024-03-15",
+      "total_price": 25000000,
+      "unit_price": 83333,
+      "land_area_sqm": 150.5,
+      "building_area_sqm": 90.0,
+      "urban_zoning": "Others",
+      "land_use_category": "住",
+      "building_type": "建物",
+      "floor": 3,
+      "age": 10,
+      "parking_area": 25.0,
+      "parking_price": 1500000
+    },
+    {
+      "transaction_id": "txn-golden-002",
+      "county": "澎湖縣",
+      "district": "西嶼鄉",
+      "section": "竹篙灣段",
+      "land_number": "3616",
+      "transaction_type": "買賣",
+      "transaction_date": "2024-05-20",
+      "total_price": 28000000,
+      "unit_price": 93333,
+      "land_area_sqm": 160.0,
+      "building_area_sqm": 95.5,
+      "urban_zoning": "Others",
+      "land_use_category": "住",
+      "building_type": "建物",
+      "floor": 2,
+      "age": 15,
+      "parking_area": 30.0,
+      "parking_price": 1800000
+    }
+  ]
+}
