@@ -29,7 +29,7 @@ func registerValuationTools(srv *mcpapi.Server, s *Server) {
 			Name:        "estimate_land_value",
 			Description: "Estimate land value for a target parcel using comparable transactions (per ping, yuan/坪). Returns bear/base/bull values with confidence and full provenance chain.",
 		},
-		estimateLandValueHandler(s),
+		instrument(s, "estimate_land_value", "valuation", estimateLandValueHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -37,7 +37,7 @@ func registerValuationTools(srv *mcpapi.Server, s *Server) {
 			Name:        "estimate_property_value",
 			Description: "Estimate total property value including building valuation on top of land value.",
 		},
-		estimatePropertyValueHandler(s),
+		instrument(s, "estimate_property_value", "valuation", estimatePropertyValueHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -45,7 +45,7 @@ func registerValuationTools(srv *mcpapi.Server, s *Server) {
 			Name:        "explain_valuation",
 			Description: "Get a detailed explanation of a valuation result including scoring methodology, comparable analysis, and confidence reasoning.",
 		},
-		explainValuationHandler(s),
+		instrument(s, "explain_valuation", "valuation", explainValuationHandler(s)),
 	)
 }
 

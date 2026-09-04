@@ -16,7 +16,7 @@ func registerProvenanceTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_data_snapshot",
 			Description: "Get information about a dataset snapshot (import batch metadata, source file, status).",
 		},
-		getDataSnapshotHandler(s),
+		instrument(s, "get_data_snapshot", "", getDataSnapshotHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -24,7 +24,7 @@ func registerProvenanceTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_data_provenance",
 			Description: "Get full provenance chain for a transaction or valuation result. Tracer bullets from source file → snapshot → record hash.",
 		},
-		getDataProvenanceHandler(s),
+		instrument(s, "get_data_provenance", "", getDataProvenanceHandler(s)),
 	)
 }
 

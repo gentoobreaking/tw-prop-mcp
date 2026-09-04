@@ -28,7 +28,7 @@ func registerComparableTools(srv *mcpapi.Server, s *Server) {
 			Name:        "find_comparable_transactions",
 			Description: "Find comparable real estate transactions for a target parcel. Uses comparable engine with area/temporal/zoning/land-use/road-access scoring weighted by distance decay.",
 		},
-		findComparableTransactionsHandler(s),
+		instrument(s, "find_comparable_transactions", "comparable", findComparableTransactionsHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -36,7 +36,7 @@ func registerComparableTools(srv *mcpapi.Server, s *Server) {
 			Name:        "score_comparable_transactions",
 			Description: "Score a set of comparable transactions against a target parcel using the comparable engine's scoring algorithm.",
 		},
-		scoreComparableTransactionsHandler(s),
+		instrument(s, "score_comparable_transactions", "comparable", scoreComparableTransactionsHandler(s)),
 	)
 }
 

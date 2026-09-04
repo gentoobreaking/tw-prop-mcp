@@ -21,7 +21,7 @@ func registerTransactionTools(srv *mcpapi.Server, s *Server) {
 			Name:        "search_transactions",
 			Description: "Search real estate transactions with structured filters. Returns transactions with price statistics and provenance.",
 		},
-		searchTransactionsHandler(s),
+		instrument(s, "search_transactions", "transaction", searchTransactionsHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -29,7 +29,7 @@ func registerTransactionTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_transaction",
 			Description: "Get a single transaction by ID with full provenance chain.",
 		},
-		getTransactionHandler(s),
+		instrument(s, "get_transaction", "transaction", getTransactionHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -37,7 +37,7 @@ func registerTransactionTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_transaction_statistics",
 			Description: "Get price/area statistics for transactions matching filters (1 ping = 3.305785 sqm).",
 		},
-		getTransactionStatisticsHandler(s),
+		instrument(s, "get_transaction_statistics", "transaction", getTransactionStatisticsHandler(s)),
 	)
 }
 

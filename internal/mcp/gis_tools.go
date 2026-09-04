@@ -38,7 +38,7 @@ func registerGISTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_parcel_geometry",
 			Description: "Get parcel geometry (MultiPolygon, centroid, bbox, area). Coordinates in EPSG:4326 by default.",
 		},
-		getParcelGeometryHandler(s),
+		instrument(s, "get_parcel_geometry", "gis", getParcelGeometryHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -46,7 +46,7 @@ func registerGISTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_parcel_location",
 			Description: "Get parcel centroid latitude/longitude and map context (zoom level).",
 		},
-		getParcelLocationHandler(s),
+		instrument(s, "get_parcel_location", "gis", getParcelLocationHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -54,7 +54,7 @@ func registerGISTools(srv *mcpapi.Server, s *Server) {
 			Name:        "find_nearby_roads",
 			Description: "Find nearby road segments for a parcel.",
 		},
-		findNearbyRoadsHandler(s),
+		instrument(s, "find_nearby_roads", "gis", findNearbyRoadsHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -62,7 +62,7 @@ func registerGISTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_parcel_map_context",
 			Description: "Get map context (latitude, longitude, zoom) for frontend map display.",
 		},
-		getParcelMapContextHandler(s),
+		instrument(s, "get_parcel_map_context", "gis", getParcelMapContextHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -70,7 +70,7 @@ func registerGISTools(srv *mcpapi.Server, s *Server) {
 			Name:        "check_road_access",
 			Description: "Check road access for a parcel. Returns status: ROAD_ADJACENT, ROAD_NEARBY, NO_ROAD_DETECTED, or UNKNOWN.",
 		},
-		checkRoadAccessHandler(s),
+		instrument(s, "check_road_access", "gis", checkRoadAccessHandler(s)),
 	)
 }
 

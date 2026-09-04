@@ -1,0 +1,92 @@
+# Prometheus alert rules for tw-prop-mcp MCP server (Spec T024)
+groups:
+  - name: tw-prop-mcp
+    rules:
+
+    # --- High Error Rate ---
+    - alert: MCPHighErrorRate
+      expr: rate(mcp_requests_total{success="false"}[5m]) / rate(mcp_requests_total[5m]) * 100 > 5
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High MCP error rate ({{ $value }}%)"
+        description: "MCP error rate exceeded 5% for more than 2 minutes."
+
+    - alert: MCPVeryHighErrorRate
+      expr: rate(mcp_requests_total{success="false"}[5m]) / rate(mcp_requests_total[5m]) * 100 > 20
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Critical MCP error rate ({{ $value }}%)"
+        description: "MCP error rate exceeded 20% for more than 1 minute."
+
+    # --- High Latency ---
+    - alert: MCPHighLatency
+      expr: histogram_quantile(0.95, sum(rate(mcp_request_duration_seconds_bucket[5m])) by (le)) > 2
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High MCP p95 latency ({{ $value }}s)"
+        description: "MCP p95 request latency exceeded 2s for more than 2 minutes."
+
+    - alert: MCPVeryHighLatency
+      expr: histogram_quantile(0.95, sum(rate(mcp_request_duration_seconds_bucket[5m])) by (le)) > 5
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Critical MCP p95 latency ({{ $value }}s)"
+        description: "MCP p95 request latency exceeded 5s for more than 1 minute."
+
+    # --- Data Import Failures ---
+    - alert: DataImportFailed
+      expr: increase(data_import_errors[1h]) > 0
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Data import failed ({{ $value }} errors in 1h)"
+        description: "One or more data imports failed in the last hour."
+
+    # --- Valuation Failures ---
+    - alert: ValuationFailureRate
+      expr: rate(mcp_requests_total{tool="estimate_land_value",success="false"}[5m]) / rate(mcp_requests_total{tool="estimate_land_value"}[5m]) * 100 > 10
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High valuation failure rate ({{ $value }}%)"
+        description: "Valuation tool failure rate exceeded 10% for more than 2 minutes."
+
+    # --- Server Health ---
+    - alert: MCPServerDown
+      expr: absent(up{job="tw-prop-mcp"}) == 1
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "MCP server is down"
+        description: "The MCP server has been down for more than 1 minute."
+
+    # --- PostgreSQL Health ---
+    - alert: PostgreSQLDown
+      expr: absent(pg_up{job="postgres"}) == 1
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "PostgreSQL is down"
+        description: "The PostgreSQL database has been down for more than 1 minute."
+
+    # --- PostgreSQL High Connections ---
+    - alert: PostgreSQLHighConnectionCount
+      expr: pg_stat_activity_count{state="active"} / pg_settings_max_connections * 100 > 80
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL high connection usage ({{ $value }}%)"
+        description: "PostgreSQL active connections exceeded 80% of max_connections."

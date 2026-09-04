@@ -1,0 +1,193 @@
+{
+  "id": null,
+  "title": "tw-prop-mcp — MCP Server Observability",
+  "tags": ["tw-prop-mcp", "mcp", "postgresql", "gis"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total MCP Requests",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(mcp_requests_total)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Total Requests"
+        }
+      ],
+      "options": { "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Requests/sec (5m avg)",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(mcp_requests_total[5m])",
+          "format": "time_series",
+          "legendFormat": "RPS"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 2 } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Error Rate (5m)",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(mcp_requests_total{success=\"false\"}[5m]) / rate(mcp_requests_total[5m]) * 100",
+          "format": "time_series",
+          "legendFormat": "Error %"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 2 } }
+    },
+    {
+      "id": 4,
+      "type": "graph",
+      "title": "MCP Request Duration (p95, 5m)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(mcp_request_duration_seconds_bucket[5m])) by (le, tool))",
+          "format": "time_series",
+          "legendFormat": "p95 {{tool}}"
+        }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 5,
+      "type": "graph",
+      "title": "Transaction Query Rate",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "rate(transaction_query_total[5m])",
+          "format": "time_series",
+          "legendFormat": "txn queries/sec"
+        }
+      ],
+      "options": { "legend": { "displayMode": "list" } },
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 6,
+      "type": "graph",
+      "title": "GIS Query Rate",
+      "gridPos": { "h": 8, "w": 3, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "rate(gis_query_total[5m])",
+          "legendFormat": "gis queries/sec"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 7,
+      "type": "graph",
+      "title": "Comparable Query Rate",
+      "gridPos": { "h": 8, "w": 3, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "rate(comparable_query_total[5m])",
+          "legendFormat": "comparable queries/sec"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 8,
+      "type": "graph",
+      "title": "Valuation Query Rate",
+      "gridPos": { "h": 8, "w": 3, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "rate(valuation_query_total[5m])",
+          "legendFormat": "valuation queries/sec"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Data Imports (total)",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 12 },
+      "targets": [
+        { "expr": "data_import_total", "legendFormat": "Imports" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Data Import Errors",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 12 },
+      "targets": [
+        { "expr": "data_import_errors", "legendFormat": "Errors" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": "red" } }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Snapshots Locked",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 12 },
+      "targets": [
+        { "expr": "snapshot_locked_total", "legendFormat": "Snapshots Locked" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Tool Request Counts (by tool, success)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by(tool, success) (mcp_requests_total)",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "options": {},
+      "fieldConfig": {}
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "tool",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "refresh": 1,
+        "query": {
+          "expr": "label_values(mcp_requests_total, tool)",
+          "instant": true
+        },
+        "includeTime": false,
+        "multi": true,
+        "allowAll": true,
+        "allValue": ".*",
+        "name": "tool"
+      }
+    ]
+  }
+}

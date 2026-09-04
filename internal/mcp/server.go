@@ -50,6 +50,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	mcpapi "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -131,6 +132,8 @@ func (s *Server) RunHTTP(ctx context.Context) error {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+	// Prometheus metrics endpoint (Spec T024: observability)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	addr := s.config.HTTPAddr
 	if addr == "" {

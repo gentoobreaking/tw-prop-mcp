@@ -36,7 +36,7 @@ func registerParcelTools(srv *mcpapi.Server, s *Server) {
 			Name:        "get_parcel",
 			Description: "Get a single parcel by full four-key location (county, district, section, land_number).",
 		},
-		getParcelHandler(s),
+		instrument(s, "get_parcel", "gis", getParcelHandler(s)),
 	)
 
 	mcpapi.AddTool(srv,
@@ -44,7 +44,7 @@ func registerParcelTools(srv *mcpapi.Server, s *Server) {
 			Name:        "search_parcels",
 			Description: "Search parcels with filters for area, zoning, and location. Returns paginated results.",
 		},
-		searchParcelsHandler(s),
+		instrument(s, "search_parcels", "gis", searchParcelsHandler(s)),
 	)
 }
 
