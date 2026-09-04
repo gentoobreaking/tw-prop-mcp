@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"tw-prop-mcp/internal/downloader"
 	mcp "tw-prop-mcp/internal/mcp"
 )
 
@@ -18,6 +19,8 @@ func main() {
 		addr       = flag.String("addr", "", "HTTP listen address (env: MCP_HTTP_ADDR)")
 		snapshotID = flag.String("snapshot-id", "", "Dataset snapshot ID (env: DEFAULT_SNAPSHOT_VERSION)")
 		algorithm  = flag.String("algorithm", "", "Algorithm version (env: ALGORITHM_VERSION)")
+		dataURL    = flag.String("data-url", "", "Direct download URL for import (env: DATA_IMPORT_URL)")
+		autoImport = flag.Bool("auto", false, "Auto-discover latest data URL from MOI landing page")
 	)
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "tw-prop-mcp — Taiwan Real-Estate MCP Server v2.0.0")
@@ -93,6 +96,22 @@ func main() {
 
 	shutdown := mcp.InitTracer(ctx)
 	defer shutdown(ctx)
+
+	// Auto-discover latest data URL from MOI landing page if --auto flag is set
+	resolvedDataURL := *dataURL
+	if resolvedDataURL == "" {
+		resolvedDataURL = os.Getenv("DATA_IMPORT_URL")
+	}
+	if *autoImport {
+		foundURL, err := downloader.AutoDiscoverLatestURL(ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "auto-discover failed: %v\n", err)
+		} else {
+			resolvedDataURL = foundURL
+			fmt.Fprintf(os.Stderr, "auto-discovered data URL: %s\n", foundURL)
+		}
+	}
+	_ = resolvedDataURL // logged for server-side import tool usage
 
 	// Create MCP server
 	srv := mcp.NewServer(mcp.ServerConfig{
