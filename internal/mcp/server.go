@@ -52,6 +52,8 @@ import (
 
 	mcpapi "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"tw-prop-mcp/internal/repository"
 )
 
 // ServerConfig holds the configuration for the MCP server.
@@ -71,12 +73,15 @@ type ServerConfig struct {
 // Wraps the official MCP SDK server with provenance injection,
 // observability, and AI Isolation enforcement (P4).
 type Server struct {
-	server  *mcpapi.Server
-	config  ServerConfig
-	metrics *Metrics
+	server        *mcpapi.Server
+	config        ServerConfig
+	metrics       *Metrics
+	configVersion string
+	snapshotID    string
+	TxRepo        repository.TransactionRepository
+	ParcelRepo    repository.ParcelRepository
 }
 
-// NewServer creates a new MCP server with the given configuration.
 func NewServer(config ServerConfig) *Server {
 	impl := &mcpapi.Implementation{
 		Name:    config.Name,
@@ -86,14 +91,15 @@ func NewServer(config ServerConfig) *Server {
 	srv := mcpapi.NewServer(impl, opts)
 
 	s := &Server{
-		server:  srv,
-		config:  config,
-		metrics: newMetrics(),
+		server:        srv,
+		config:        config,
+		metrics:       newMetrics(),
+		configVersion: config.ConfigurationVersion,
+		snapshotID:    config.SnapshotID,
 	}
-
 	s.registerTools()
 	s.registerResources()
-
+	s.registerPrompts()
 	return s
 }
 
