@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -212,30 +213,38 @@ func InitTracer(ctx context.Context) func(context.Context) error {
 	if endpoint == "" {
 		endpoint = os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
 	}
-	// Normalize: strip trailing slash and http(s) prefix if present
-	if endpoint != "" {
-		// otlptracehttp.WithEndpoint expects host:port or host without scheme
-		opts := []otlptracehttp.Option{
-			otlptracehttp.WithEndpoint(endpoint),
-			otlptracehttp.WithInsecure(),
-		}
-		exporter, err := otlptracehttp.New(ctx, opts...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "otel: failed to create OTLP exporter: %v\n", err)
-		} else {
-			tp := sdktrace.NewTracerProvider(
-				sdktrace.WithBatcher(exporter),
-				sdktrace.WithResource(resource.NewWithAttributes(
-					"service.name", attribute.String("service.name", "tw-prop-mcp"),
-				)),
-			)
-			otel.SetTracerProvider(tp)
-			tracer = otel.Tracer("tw-prop-mcp/mcp")
-			return tp.Shutdown
-		}
+
+	if endpoint == "" {
+		fmt.Fprintln(os.Stderr, "otel: OTEL_EXPORTER_OTLP_ENDPOINT not set — using no-op tracer (set OTEL_EXPORTER_OTLP_ENDPOINT=http://host:4318 to enable)")
+		return func(context.Context) error { return nil }
 	}
-	// Fallback: no-op tracer provider (traces discarded)
-	return func(context.Context) error { return nil }
+
+	// Normalize: strip scheme prefix (otlptracehttp.WithEndpoint expects host:port)
+	endpoint = strings.TrimPrefix(endpoint, "http://")
+	endpoint = strings.TrimPrefix(endpoint, "https://")
+	endpoint = strings.TrimSuffix(endpoint, "/")
+
+	opts := []otlptracehttp.Option{
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	}
+
+	exporter, err := otlptracehttp.New(ctx, opts...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "otel: failed to create OTLP exporter: %v (continuing with no-op tracer)\n", err)
+		return func(context.Context) error { return nil }
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			"https://opentelemetry.io/schemas/1.28.0",
+			attribute.String("service.name", "tw-prop-mcp"),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	tracer = otel.Tracer("tw-prop-mcp/mcp")
+	return tp.Shutdown
 }
 
 // StartTrace starts an OpenTelemetry span for a tool call.
