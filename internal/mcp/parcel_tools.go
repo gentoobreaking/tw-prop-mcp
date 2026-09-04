@@ -64,7 +64,7 @@ func getParcelHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolR
 
 		repo := s.getParcelRepository()
 		if repo == nil {
-			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), parcelOutput{}, nil
+			return mcpErrorResult(NewError(ErrorCodeDataNotAvailable, "no database configured")), parcelOutput{}, nil
 		}
 
 		parcel, err := repo.GetByLandNumber(ctx, input.County, input.District, input.Section, input.LandNumber)
@@ -104,7 +104,7 @@ func searchParcelsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallT
 
 		repo := s.getParcelRepository()
 		if repo == nil {
-			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), searchParcelsOutput{}, nil
+			return mcpErrorResult(NewError(ErrorCodeDataNotAvailable, "no database configured")), searchParcelsOutput{}, nil
 		}
 
 		var section *string

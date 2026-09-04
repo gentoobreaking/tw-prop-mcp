@@ -93,6 +93,9 @@ func searchTransactionsHandler(s *Server) func(ctx context.Context, req *mcpapi.
 		}
 
 		svc := s.getTransactionService()
+		if svc == nil {
+			return mcpErrorResult(NewError(ErrorCodeDataNotAvailable, "no database configured")), transactionSearchOutput{}, nil
+		}
 		result, err := svc.SearchTransactions(ctx, params)
 		if err != nil {
 			return mcpErrorResult(wrapServiceError(err)), transactionSearchOutput{}, nil
@@ -124,6 +127,9 @@ func getTransactionHandler(s *Server) func(ctx context.Context, req *mcpapi.Call
 		}
 
 		svc := s.getTransactionService()
+		if svc == nil {
+			return mcpErrorResult(NewError(ErrorCodeDataNotAvailable, "no database configured")), nil, nil
+		}
 		data, err := svc.GetTransaction(ctx, input.TransactionID)
 		if err != nil {
 			if errors.Is(err, repository.ErrTransactionNotFound) {
@@ -160,6 +166,9 @@ func getTransactionStatisticsHandler(s *Server) func(ctx context.Context, req *m
 		}
 
 		svc := s.getTransactionService()
+		if svc == nil {
+			return mcpErrorResult(NewError(ErrorCodeDataNotAvailable, "no database configured")), nil, nil
+		}
 		result, err := svc.GetTransactionStatistics(ctx, params)
 		if err != nil {
 			return mcpErrorResult(wrapServiceError(err)), nil, nil
@@ -173,6 +182,9 @@ func getTransactionStatisticsHandler(s *Server) func(ctx context.Context, req *m
 
 func (s *Server) getTransactionService() *service.TransactionService {
 	repo := s.getTransactionRepository()
+	if repo == nil {
+		return nil
+	}
 	return service.NewTransactionService(repo)
 }
 

@@ -94,7 +94,7 @@ func getParcelGeometryHandler(s *Server) func(ctx context.Context, req *mcpapi.C
 
 		repo := s.getParcelRepository()
 		if repo == nil {
-			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), geometryOutput{}, nil
+			return mcpErrorResult(NewError(ErrorCodeDataNotAvailable, "no database configured")), geometryOutput{}, nil
 		}
 
 		parcel, err := repo.GetByLandNumber(ctx, input.County, input.District, input.Section, input.LandNumber)
@@ -146,7 +146,7 @@ func getParcelLocationHandler(s *Server) func(ctx context.Context, req *mcpapi.C
 
 		repo := s.getParcelRepository()
 		if repo == nil {
-			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), locationOutput{}, nil
+			return mcpErrorResult(NewError(ErrorCodeDataNotAvailable, "no database configured")), locationOutput{}, nil
 		}
 
 		parcel, err := repo.GetByLandNumber(ctx, input.County, input.District, input.Section, input.LandNumber)
