@@ -11,11 +11,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	otlptracehttp "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
-	otlptracehttp "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 )
+
 //
 // Spec T024: mcp_requests_total, mcp_request_duration_seconds,
 // transaction_query_total, transaction_query_duration,
@@ -236,7 +237,6 @@ func InitTracer(ctx context.Context) func(context.Context) error {
 	// Fallback: no-op tracer provider (traces discarded)
 	return func(context.Context) error { return nil }
 }
-
 
 // StartTrace starts an OpenTelemetry span for a tool call.
 // Spec T024: trace should include tool_name, snapshot_id, query_hash.

@@ -17,8 +17,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"tw-prop-mcp/internal/downloader"
 	"tw-prop-mcp/internal/domain"
+	"tw-prop-mcp/internal/downloader"
 	"tw-prop-mcp/internal/mcp"
 	"tw-prop-mcp/internal/normalizer"
 	"tw-prop-mcp/internal/parser"
@@ -77,17 +77,17 @@ type PipelineConfig struct {
 
 // ImportPipeline orchestrates the complete data import flow.
 type ImportPipeline struct {
-	Downloader     *downloader.HTTPDownloader
-	Parser         *parser.Parser
-	Normalizer     *normalizer.Normalizer
-	Validator      *validator.Validator
-	TxRepo         repository.TransactionRepository
-	ParcelRepo     repository.ParcelRepository
-	SnapshotRepo   repository.SnapshotRepository
-	Config         PipelineConfig
-	Status         ImportPipelineStatus
-	CurrentStage   string
-	Logger         *slog.Logger
+	Downloader   *downloader.HTTPDownloader
+	Parser       *parser.Parser
+	Normalizer   *normalizer.Normalizer
+	Validator    *validator.Validator
+	TxRepo       repository.TransactionRepository
+	ParcelRepo   repository.ParcelRepository
+	SnapshotRepo repository.SnapshotRepository
+	Config       PipelineConfig
+	Status       ImportPipelineStatus
+	CurrentStage string
+	Logger       *slog.Logger
 }
 
 // NewImportPipeline creates a new ImportPipeline with default components.
@@ -103,13 +103,13 @@ func NewImportPipeline(config PipelineConfig, logger *slog.Logger) *ImportPipeli
 	}
 
 	return &ImportPipeline{
-		Downloader:    downloader.NewHTTPDownloader(),
-		Parser:        parser.NewParser(),
-		Normalizer:    normalizer.New(),
-		Validator:     validator.New(nil), // uses default clock
-		Config:        config,
-		Status:        StatusPending,
-		Logger:        logger.With("snapshot_id", config.SnapshotID),
+		Downloader: downloader.NewHTTPDownloader(),
+		Parser:     parser.NewParser(),
+		Normalizer: normalizer.New(),
+		Validator:  validator.New(nil), // uses default clock
+		Config:     config,
+		Status:     StatusPending,
+		Logger:     logger.With("snapshot_id", config.SnapshotID),
 	}
 }
 
@@ -229,14 +229,14 @@ func (p *ImportPipeline) initSnapshot(ctx context.Context) error {
 
 	// Create new snapshot with the configured SnapshotID
 	_, err = p.SnapshotRepo.Create(ctx, repository.CreateSnapshotParams{
-		ID:             p.Config.SnapshotID,
-		Source:         "OFFICIAL_CSV",
-		SourceVersion:  "v2.0",
-		FileName:       filepath.Base(p.Config.DownloadURL),
-		FileSHA256:     p.Config.ExpectedChecksum,
-		RecordCount:    0,
-		Status:         domain.SnapshotStatusPending,
-		SchemaVersion:  "v2.0",
+		ID:            p.Config.SnapshotID,
+		Source:        "OFFICIAL_CSV",
+		SourceVersion: "v2.0",
+		FileName:      filepath.Base(p.Config.DownloadURL),
+		FileSHA256:    p.Config.ExpectedChecksum,
+		RecordCount:   0,
+		Status:        domain.SnapshotStatusPending,
+		SchemaVersion: "v2.0",
 	})
 	return err
 }
@@ -329,6 +329,7 @@ var moiCountyMap = map[string]string{
 	"t": "屏東縣", "u": "花蓮縣", "v": "臺東縣", "w": "金門縣",
 	"x": "澎湖縣",
 }
+
 func countyFromFilename(name string) string {
 	base := name
 	if dot := strings.LastIndex(base, "."); dot > 0 {
