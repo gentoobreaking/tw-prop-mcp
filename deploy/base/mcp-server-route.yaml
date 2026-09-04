@@ -1,0 +1,29 @@
+# OpenShift Route — exposes the MCP server HTTP API externally.
+# On vanilla Kubernetes, replace with an Ingress of your choice (see deploy/README.md).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: mcp-server
+  namespace: tw-prop-mcp
+  labels:
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: mcp-server
+  annotations:
+    # Route is TLS-terminated at the OpenShift edge router.
+    haproxy.router.openshift.io/disable_cookies: "true"
+    # Connection timeout for long-lived MCP sessions.
+    haproxy.router.openshift.io/timeout: 60s
+spec:
+  host: mcp-server.tw-prop-mcp.apps.cluster.local
+  path: /
+  scheme: https
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: mcp-server
+    weight: 100
+  port:
+    targetPort: http
+  wildcardPolicy: None

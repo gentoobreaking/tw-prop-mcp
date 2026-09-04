@@ -1,0 +1,163 @@
+# PostgreSQL 16 + PostGIS 3.5 StatefulSet
+#
+# NOTE on image architecture:
+#   The official postgis/postgis:16-3.5 image is published for amd64 only.
+#   On arm64 clusters (Apple Silicon, AWS Graviton) use the Crunchy Data image:
+#     docker.io/crunchydata/postgres:16.6
+#   and install PostGIS via an init-container that runs CREATE EXTENSION.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: tw-prop-mcp
+  labels:
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/version: "16-postgis-3.5"
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        app.kubernetes.io/name: tw-prop-mcp
+        app.kubernetes.io/component: postgres
+        app.kubernetes.io/version: "16-postgis-3.5"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 26
+        runAsGroup: 26
+        fsGroup: 26
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgres
+          image: docker.io/postgis/postgis:16-3.5
+          imagePullPolicy: IfNotPresent
+          args:
+            - -c
+            - max_connections=100
+            - -c
+            - shared_buffers=256MB
+            - -c
+            - work_mem=16MB
+            - -c
+            - maintenance_work_mem=256MB
+            - -c
+            - effective_cache_size=1GB
+            - -c
+            - checkpoint_completion_target=0.9
+            - -c
+            - wal_buffers=16MB
+            - -c
+            - default_statistics_target=100
+            - -c
+            - random_page_cost=1.1
+          env:
+            - name: POSTGRES_DB
+              value: prop
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-server-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-server-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres
+          livenessProbe:
+            exec:
+              command:
+                - /usr/local/bin/pg_isready
+                - -U
+                - prop
+                - -d
+                - prop
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - /usr/local/bin/pg_isready
+                - -U
+                - prop
+                - -d
+                - prop
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+
+        - name: init-migrations
+          image: ghcr.io/tw-prop-mcp/server:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              # Wait for PostgreSQL to be ready.
+              until pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              # Run migrations.
+              migrate -path /migrations -database "postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/prop?sslmode=disable" up || true
+              echo "Migrations completed."
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-server-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-server-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: prop
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+      volumes:
+        - name: migrations
+          configMap:
+            name: schema-migrations
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data

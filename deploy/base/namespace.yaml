@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tw-prop-mcp
+  labels:
+    name: tw-prop-mcp
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: namespace

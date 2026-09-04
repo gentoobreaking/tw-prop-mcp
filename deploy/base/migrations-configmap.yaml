@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: schema-migrations
+  namespace: tw-prop-mcp
+  labels:
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/part-of: migrations
+data:
+  000001_init.up.sql: |-
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+    CREATE TABLE dataset_snapshot (...);
+    CREATE TABLE import_batch (...);
+    -- Full schema lives in the repo migrations/ directory.
+  # NOTE: The complete migration files (000001–000004) should be copied from
+  # the repository migrations/ directory.  This ConfigMap provides a minimal
+  # init so the init-container can verify connectivity.  For production
+  # deployments, mount the full migrations as a volume instead.

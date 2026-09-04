@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+  namespace: tw-prop-mcp
+  labels:
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: mcp-server
+  annotations:
+    service.beta.kubernetes.io/openshift-serving-cert: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: mcp-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+      # The MCP server exposes Streamable HTTP on /mcp (default :8080)
+      # Prometheus metrics are served on the same port at /metrics
+  sessionAffinity: None

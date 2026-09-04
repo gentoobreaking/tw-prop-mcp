@@ -1,0 +1,33 @@
+# ServiceMonitor — tells the Prometheus Operator how to scrape MCP server metrics.
+# Requires the prometheus-operator / kube-prometheus-stack to be installed.
+#
+# The MCP server exposes in-memory Prometheus-style metrics
+# (Spec T017: mcp_requests_total, mcp_request_duration_seconds) on the
+# same HTTP port as the MCP API.  This ServiceMonitor targets the /metrics
+# endpoint via the mcp-server Service.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mcp-server
+  namespace: tw-prop-mcp
+  labels:
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: mcp-server
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: mcp-server
+  namespaceSelector:
+    matchNames:
+      - tw-prop-mcp
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - target: __address__
+          replacement: mcp-server.tw-prop-mcp.svc.cluster.local:8080
+  # Metrics from the PostgreSQL container are scraped separately via
+  # a postgres-exporter sidecar or the postgres-exporter DaemonSet.

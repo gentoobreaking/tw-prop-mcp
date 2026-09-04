@@ -1,0 +1,85 @@
+# CronJob: Official Data Download → Import Pipeline
+#
+# Runs weekly to download the latest MOI real-price registration data,
+# verify checksums, and import into PostgreSQL.  The pipeline follows:
+#   Download → SHA256 verify → Archive → Parse → Normalize → Validate →
+#   Deduplicate → Import → Lock snapshot
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: data-import
+  namespace: tw-prop-mcp
+  labels:
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: data-import
+    app.kubernetes.io/version: "v2.0.0"
+spec:
+  # Weekly at 02:00 UTC on Sunday (off-peak hours)
+  schedule: "0 2 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 7200
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mcp-server
+              image: ghcr.io/tw-prop-mcp/server:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== tw-prop-mcp Data Import Pipeline ==="
+                  echo "Starting at: $(date -u)"
+                  echo "Snapshot source: $DATA_SOURCE_NAME"
+                  echo "Snapshot version: $DEFAULT_SNAPSHOT_VERSION"
+                  #
+                  # The MCP server binary includes an import subcommand that:
+                  #   1. Downloads the latest official CSV archive from MOI
+                  #   2. Verifies SHA256 checksum
+                  #   3. Stores raw archive (immutable, per P2)
+                  #   4. Creates a PENDING dataset_snapshot
+                  #   5. Parses, normalizes, validates, deduplicates CSV rows
+                  #   6. Imports into PostgreSQL via pgx copy
+                  #   7. Locks the snapshot (status → LOCKED, per P5)
+                  /usr/local/bin/realestate-mcp import \
+                    --source "$$DATA_SOURCE_NAME" \
+                    --version "$$DEFAULT_SNAPSHOT_VERSION" \
+                    --url "$$MOI_DATA_DOWNLOAD_URL" \
+                    --dest "$$DOWNLOAD_DEST" \
+                    --db-host "$$DB_HOST" \
+                    --db-port "$$DB_PORT" \
+                    --db-name "$$DB_NAME" \
+                    --db-user "$$DB_USER" \
+                    --db-password "$$DB_PASSWORD" \
+                    --db-sslmode "$$DB_SSLMODE"
+                  echo "Import completed at: $(date -u)"
+              envFrom:
+                - configMapRef:
+                    name: mcp-server-config
+                - secretRef:
+                    name: mcp-server-secret
+              env:
+                - name: DOWNLOAD_DEST
+                  value: /tmp/mcp-data-import
+              volumeMounts:
+                - name: data-import
+                  mountPath: /tmp/mcp-data-import
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "1Gi"
+                limits:
+                  cpu: "2000m"
+                  memory: "4Gi"
+          volumes:
+            - name: data-import
+              emptyDir:
+                sizeLimit: "2Gi"

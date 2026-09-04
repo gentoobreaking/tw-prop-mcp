@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: tw-prop-mcp
+  labels:
+    app.kubernetes.io/name: tw-prop-mcp
+    app.kubernetes.io/component: postgres
+  annotations:
+    # Recommended: use a StorageClass that supports ReadWriteOnce and volume expansion.
+    # On OpenShift, the default StorageClass (e.g. openshift-storage) is typically sufficient.
+    volume.beta.kubernetes.io/storage-class: standard
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+  volumeMode: Filesystem
