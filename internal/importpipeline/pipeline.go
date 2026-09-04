@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,6 +56,7 @@ const (
 	StatusPending     ImportPipelineStatus = "PENDING"
 	StatusDownloading ImportPipelineStatus = "DOWNLOADING"
 	StatusParsing     ImportPipelineStatus = "PARSING"
+	StatusEnriching   ImportPipelineStatus = "ENRICHING"
 	StatusNormalizing ImportPipelineStatus = "NORMALIZING"
 	StatusValidating  ImportPipelineStatus = "VALIDATING"
 	StatusImporting   ImportPipelineStatus = "IMPORTING"
@@ -69,6 +72,7 @@ type PipelineConfig struct {
 	ExpectedChecksum string // Optional SHA256 checksum
 	MaxRetries       int
 	RetryDelay       time.Duration
+	DataProvider     string // County name for data source (e.g. "臺北市")
 }
 
 // ImportPipeline orchestrates the complete data import flow.
@@ -155,7 +159,11 @@ func (p *ImportPipeline) ImportFromSource(ctx context.Context) (ImportResult, er
 		return result, p.wrapError("parse", err)
 	}
 
-	// Stage 4: Normalize
+	// Stage 4a: Enrich rows (parse parcel_address, derive county)
+	p.setStatus(StatusEnriching)
+	rawRows = p.enrichRows(rawRows)
+
+	// Stage 4b: Normalize
 	p.setStatus(StatusNormalizing)
 	transactions, parcels, err := p.normalize(rawRows)
 	if err != nil {
@@ -292,6 +300,72 @@ func (p *ImportPipeline) parse(ctx context.Context, archivePath string) ([]map[s
 	}
 	p.Logger.Info("parsing completed", "rows", len(rows))
 	return rows, nil
+}
+
+// moiAddressRe extracts section and land number from MOI parcel_address.
+// Example: "光華段二小段720-1地號" -> section="光華段二小段", land_number="720-1"
+var moiAddressRe = regexp.MustCompile(`(.+?段(?:(.)小段)?)(\d+(?:-\d+)?)地號`)
+
+// parseSectionLandNumber extracts section and land_number from the MOI
+// "土地位置建物門牌" (parcel_address) field.
+func parseSectionLandNumber(addr string) (section, landNumber string) {
+	if addr == "" {
+		return "", ""
+	}
+	m := moiAddressRe.FindStringSubmatch(addr)
+	if m == nil {
+		return "", ""
+	}
+	return m[1], m[3]
+}
+
+// countyFromFilename derives county name from MOI filename prefix.
+// Mapping is based on the official MOI real-price registration data manifest.
+var moiCountyMap = map[string]string{
+	"a": "臺北市", "b": "臺中市", "c": "基隆市", "d": "臺南市",
+	"e": "高雄市", "f": "新北市", "g": "宜蘭縣", "h": "桃園市",
+	"i": "嘉義市", "j": "新竹縣", "k": "苗栗縣", "m": "南投縣",
+	"n": "彰化縣", "o": "新竹市", "p": "雲林縣", "q": "嘉義縣",
+	"t": "屏東縣", "u": "花蓮縣", "v": "臺東縣", "w": "金門縣",
+	"x": "澎湖縣",
+}
+func countyFromFilename(name string) string {
+	base := name
+	if dot := strings.LastIndex(base, "."); dot > 0 {
+		base = base[:dot]
+	}
+	if len(base) > 0 {
+		prefix := string(base[0])
+		if county, ok := moiCountyMap[strings.ToLower(prefix)]; ok {
+			return county
+		}
+	}
+	return ""
+}
+
+// enrichRows augments parsed rows with county (from config or filename) and
+// parses parcel_address to extract section and land_number.
+func (p *ImportPipeline) enrichRows(rows []map[string]string) []map[string]string {
+	county := p.Config.DataProvider
+	if county == "" {
+		county = countyFromFilename(filepath.Base(p.Config.DownloadURL))
+	}
+	for _, row := range rows {
+		if county != "" && row["county"] == "" {
+			row["county"] = county
+		}
+		if addr := row["parcel_address"]; addr != "" {
+			section, landNumber := parseSectionLandNumber(addr)
+			if section != "" && row["section"] == "" {
+				row["section"] = section
+			}
+			if landNumber != "" && row["land_number"] == "" {
+				row["land_number"] = landNumber
+			}
+		}
+	}
+	p.Logger.Info("enrichment completed", "rows", len(rows), "county", county)
+	return rows
 }
 
 // normalize converts raw rows to domain objects.
