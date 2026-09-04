@@ -154,6 +154,11 @@ export async function loadMapView(params: {
   section: string;
   landNumber: string;
 }): Promise<ViewData> {
+  // First, fetch the parcel to obtain its UUID — required as input for
+	// check_road_access, find_comparable_transactions, and estimate_land_value.
+	const parcel = await getParcel(params);
+	const parcelId = parcel.parcel_id ?? parcel.id ?? '';
+
   const [
     parcelResp,
     transactionsResp,
@@ -162,12 +167,7 @@ export async function loadMapView(params: {
     valuationResp,
     mapContextResp,
   ] = await Promise.allSettled([
-    getParcelGeometry({
-      county: params.county,
-      district: params.district,
-      section: params.section,
-      landNumber: params.landNumber,
-    }),
+    getParcelGeometry(params),
     searchTransactions({
       county: params.county,
       district: params.district,
@@ -175,15 +175,10 @@ export async function loadMapView(params: {
       landNumber: params.landNumber,
       limit: 50,
     }),
-    checkRoadAccess('placeholder'),
-    findComparables({ parcelId: 'placeholder' }),
-    estimateLandValue('placeholder'),
-    getMapContext({
-      county: params.county,
-      district: params.district,
-      section: params.section,
-      landNumber: params.landNumber,
-    }),
+    checkRoadAccess(parcelId),
+    findComparables({ parcelId }),
+    estimateLandValue(parcelId),
+    getMapContext(params),
   ]);
 
   // Build ViewData with type-safe extraction

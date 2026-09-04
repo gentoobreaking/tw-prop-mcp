@@ -2,6 +2,8 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -9,10 +11,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	otlptracehttp "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 )
-
-// --- Prometheus metrics ---
 //
 // Spec T024: mcp_requests_total, mcp_request_duration_seconds,
 // transaction_query_total, transaction_query_duration,
@@ -198,6 +201,42 @@ var tracer trace.Tracer
 func init() {
 	tracer = otel.Tracer("tw-prop-mcp/mcp")
 }
+
+// InitTracer configures the OpenTelemetry tracer to export spans to the
+// OTLP HTTP endpoint specified by OTEL_EXPORTER_OTLP_ENDPOINT (default
+// http://localhost:4318). Call this once at application startup; it is
+// safe to call when OTEL is not configured (falls back to no-op trace).
+func InitTracer(ctx context.Context) func(context.Context) error {
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+	}
+	// Normalize: strip trailing slash and http(s) prefix if present
+	if endpoint != "" {
+		// otlptracehttp.WithEndpoint expects host:port or host without scheme
+		opts := []otlptracehttp.Option{
+			otlptracehttp.WithEndpoint(endpoint),
+			otlptracehttp.WithInsecure(),
+		}
+		exporter, err := otlptracehttp.New(ctx, opts...)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "otel: failed to create OTLP exporter: %v\n", err)
+		} else {
+			tp := sdktrace.NewTracerProvider(
+				sdktrace.WithBatcher(exporter),
+				sdktrace.WithResource(resource.NewWithAttributes(
+					"service.name", attribute.String("service.name", "tw-prop-mcp"),
+				)),
+			)
+			otel.SetTracerProvider(tp)
+			tracer = otel.Tracer("tw-prop-mcp/mcp")
+			return tp.Shutdown
+		}
+	}
+	// Fallback: no-op tracer provider (traces discarded)
+	return func(context.Context) error { return nil }
+}
+
 
 // StartTrace starts an OpenTelemetry span for a tool call.
 // Spec T024: trace should include tool_name, snapshot_id, query_hash.
