@@ -17,6 +17,7 @@ import (
 
 	"tw-prop-mcp/internal/downloader"
 	"tw-prop-mcp/internal/domain"
+	"tw-prop-mcp/internal/mcp"
 	"tw-prop-mcp/internal/normalizer"
 	"tw-prop-mcp/internal/parser"
 	"tw-prop-mcp/internal/repository"
@@ -68,8 +69,6 @@ type PipelineConfig struct {
 	ExpectedChecksum string // Optional SHA256 checksum
 	MaxRetries       int
 	RetryDelay       time.Duration
-	DataImportTotal  *int64 // Prometheus counter (optional)
-	DataImportErrors *int64 // Prometheus counter (optional)
 }
 
 // ImportPipeline orchestrates the complete data import flow.
@@ -204,7 +203,7 @@ func (p *ImportPipeline) ImportFromSource(ctx context.Context) (ImportResult, er
 
 	p.setStatus(StatusLocked)
 	result.Duration = time.Since(start)
-	p.incrementCounter(p.Config.DataImportTotal, int64(result.TransactionsImported+result.ParcelsImported))
+	mcp.IncDataImport(true)
 	return result, nil
 }
 
@@ -329,7 +328,7 @@ func (p *ImportPipeline) validate(transactions []domain.Transaction, parcels []d
 		issues := p.Validator.ValidateTransaction(&txn)
 		if p.Validator.HasBlockingErrors(issues) {
 			p.Logger.Warn("transaction validation failed", "id", txn.ID, "issues", issues)
-			p.incrementCounter(p.Config.DataImportErrors, 1)
+			mcp.IncDataImport(false)
 			continue
 		}
 		validTxns = append(validTxns, txn)
@@ -339,7 +338,7 @@ func (p *ImportPipeline) validate(transactions []domain.Transaction, parcels []d
 		issues := p.Validator.ValidateParcel(&parcel)
 		if p.Validator.HasBlockingErrors(issues) {
 			p.Logger.Warn("parcel validation failed", "id", parcel.ID, "issues", issues)
-			p.incrementCounter(p.Config.DataImportErrors, 1)
+			mcp.IncDataImport(false)
 			continue
 		}
 		validParcels = append(validParcels, parcel)
@@ -415,7 +414,11 @@ func (p *ImportPipeline) lockSnapshot(ctx context.Context) error {
 	if p.SnapshotRepo == nil {
 		return errors.New("snapshot repository not set")
 	}
-	return p.SnapshotRepo.Lock(ctx, p.Config.SnapshotID)
+	if err := p.SnapshotRepo.Lock(ctx, p.Config.SnapshotID); err != nil {
+		return err
+	}
+	mcp.IncSnapshotLocked()
+	return nil
 }
 
 // setStatus updates the pipeline status.
@@ -428,14 +431,6 @@ func (p *ImportPipeline) setStatus(status ImportPipelineStatus) {
 // wrapError wraps an error with stage context.
 func (p *ImportPipeline) wrapError(stage string, err error) error {
 	return &ImportPipelineError{Stage: stage, Err: err}
-}
-
-// incrementCounter increments a prometheus counter if set.
-func (p *ImportPipeline) incrementCounter(counter *int64, value int64) {
-	if counter != nil {
-		// In a real implementation, this would use prometheus
-		// *counter += value
-	}
 }
 
 // RetryableError checks if an error is retryable.
