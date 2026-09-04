@@ -1,0 +1,4 @@
+FROM postgres:16-alpine
+
+# Install PostGIS on arm64
+RUN apk add --no-cache postgresql-extension-postgis
