@@ -11,11 +11,11 @@ import (
 // --- Valuation Tools ---
 
 type estimateLandValueInput struct {
-	ParcelID            string  `json:"parcel_id" jsonschema:"description=Target parcel UUID (required)"`
-	SnapshotID          string  `json:"snapshot_id,omitempty" jsonschema:"description=Dataset snapshot ID"`
-	AlgorithmVersion    string  `json:"algorithm_version,omitempty" jsonschema:"description=Algorithm version"`
-	ConfigurationVersion string `json:"configuration_version,omitempty" jsonschema:"description=Configuration version"`
-	OutlierMethod       string  `json:"outlier_method,omitempty" jsonschema:"description=Outlier method (IQR, P10_P90, MAD)"`
+	ParcelID            string  `json:"parcel_id" jsonschema:"Target parcel UUID (required)"`
+	SnapshotID          string  `json:"snapshot_id,omitempty" jsonschema:"Dataset snapshot ID"`
+	AlgorithmVersion    string  `json:"algorithm_version,omitempty" jsonschema:"Algorithm version"`
+	ConfigurationVersion string `json:"configuration_version,omitempty" jsonschema:"Configuration version"`
+	OutlierMethod       string  `json:"outlier_method,omitempty" jsonschema:"Outlier method (IQR, P10_P90, MAD)"`
 }
 
 type estimateLandValueOutput struct {
@@ -64,11 +64,11 @@ func estimateLandValueHandler(s *Server) func(ctx context.Context, req *mcpapi.C
 }
 
 type estimatePropertyValueInput struct {
-	ParcelID            string   `json:"parcel_id" jsonschema:"description=Target parcel UUID (required)"`
+	ParcelID            string   `json:"parcel_id" jsonschema:"Target parcel UUID (required)"`
 	BuildingAreaSqm     *float64 `json:"building_area_sqm,omitempty" json:"description=Building area in sqm"`
-	BuildingType        string   `json:"building_type,omitempty" jsonschema:"description=Building type (e.g., residential, commercial)"`
-	BuildingAge         *int     `json:"building_age,omitempty" jsonschema:"description=Building age in years"`
-	ValuationResultID   string   `json:"valuation_result_id,omitempty" jsonschema:"description=Existing land valuation result ID"`
+	BuildingType        string   `json:"building_type,omitempty" jsonschema:"Building type (e.g., residential, commercial)"`
+	BuildingAge         *int     `json:"building_age,omitempty" jsonschema:"Building age in years"`
+	ValuationResultID   string   `json:"valuation_result_id,omitempty" jsonschema:"Existing land valuation result ID"`
 }
 
 type estimatePropertyValueOutput struct {
@@ -92,8 +92,8 @@ func estimatePropertyValueHandler(s *Server) func(ctx context.Context, req *mcpa
 }
 
 type explainValuationInput struct {
-	ValuationID string `json:"valuation_id" jsonschema:"description=Valuation result ID (required)"`
-	DetailLevel string `json:"detail_level,omitempty" jsonschema:"description=Detail level (basic, detailed, full)"`
+	ValuationID string `json:"valuation_id" jsonschema:"Valuation result ID (required)"`
+	DetailLevel string `json:"detail_level,omitempty" jsonschema:"Detail level (basic, detailed, full)"`
 }
 
 type explainValuationOutput struct {

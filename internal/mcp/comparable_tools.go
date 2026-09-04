@@ -11,10 +11,10 @@ import (
 // --- Comparable Tools ---
 
 type findComparableTransactionsInput struct {
-	ParcelID      string             `json:"parcel_id" jsonschema:"description=Target parcel UUID (required)"`
-	Count         int                `json:"count,omitempty" jsonschema:"description=Number of comparables (default 10)"`
-	SearchRadiusM *float64           `json:"search_radius_m,omitempty" jsonschema:"description=Search radius in meters (default 500)"`
-	Weights       map[string]float64 `json:"weights,omitempty" jsonschema:"description=Optional scoring weights override"`
+	ParcelID      string             `json:"parcel_id" jsonschema:"Target parcel UUID (required)"`
+	Count         int                `json:"count,omitempty" jsonschema:"Number of comparables (default 10)"`
+	SearchRadiusM *float64           `json:"search_radius_m,omitempty" jsonschema:"Search radius in meters (default 500)"`
+	Weights       map[string]float64 `json:"weights,omitempty" jsonschema:"Optional scoring weights override"`
 }
 
 type findComparableTransactionsOutput struct {
@@ -59,9 +59,9 @@ func findComparableTransactionsHandler(s *Server) func(ctx context.Context, req 
 }
 
 type scoreComparableTransactionsInput struct {
-	TargetTransactionID string                      `json:"target_transaction_id" jsonschema:"description=Target transaction UUID (required)"`
-	CandidateIDs        []string                    `json:"candidate_ids" jsonschema:"description=Candidate transaction IDs (required)"`
-	Weights             map[string]float64          `json:"weights,omitempty" jsonschema:"description=Optional scoring weights override"`
+	TargetTransactionID string                      `json:"target_transaction_id" jsonschema:"Target transaction UUID (required)"`
+	CandidateIDs        []string                    `json:"candidate_ids" jsonschema:"Candidate transaction IDs (required)"`
+	Weights             map[string]float64          `json:"weights,omitempty" jsonschema:"Optional scoring weights override"`
 }
 
 type scoreComparableTransactionsOutput struct {

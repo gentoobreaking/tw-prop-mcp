@@ -13,23 +13,23 @@ import (
 // --- GIS Tools ---
 
 type getParcelGeometryInput struct {
-	County    string `json:"county" jsonschema:"description=County (required)"`
-	District  string `json:"district" jsonschema:"description=District (required)"`
-	Section   string `json:"section" jsonschema:"description=Land section (required)"`
-	LandNumber string `json:"land_number" jsonschema:"description=Land number (required)"`
-	EPSG      int    `json:"epsg,omitempty" jsonschema:"description=Output EPSG code (4326 or 3826, default 4326)"`
+	County    string `json:"county" jsonschema:"County (required)"`
+	District  string `json:"district" jsonschema:"District (required)"`
+	Section   string `json:"section" jsonschema:"Land section (required)"`
+	LandNumber string `json:"land_number" jsonschema:"Land number (required)"`
+	EPSG      int    `json:"epsg,omitempty" jsonschema:"Output EPSG code (4326 or 3826, default 4326)"`
 }
 
 type getParcelMapContextInput struct {
-	County    string `json:"county" jsonschema:"description=County (required)"`
-	District  string `json:"district" jsonschema:"description=District (required)"`
-	Section   string `json:"section" jsonschema:"description=Land section (required)"`
-	LandNumber string `json:"land_number" jsonschema:"description=Land number (required)"`
+	County    string `json:"county" jsonschema:"County (required)"`
+	District  string `json:"district" jsonschema:"District (required)"`
+	Section   string `json:"section" jsonschema:"Land section (required)"`
+	LandNumber string `json:"land_number" jsonschema:"Land number (required)"`
 }
 
 type checkRoadAccessInput struct {
-	ParcelID      string `json:"parcel_id" jsonschema:"description=Parcel UUID (required)"`
-	SearchRadiusM *float64 `json:"search_radius_m,omitempty" jsonschema:"description=Search radius in meters (default 500)"`
+	ParcelID      string `json:"parcel_id" jsonschema:"Parcel UUID (required)"`
+	SearchRadiusM *float64 `json:"search_radius_m,omitempty" jsonschema:"Search radius in meters (default 500)"`
 }
 
 func registerGISTools(srv *mcpapi.Server, s *Server) {

@@ -29,7 +29,7 @@ func registerProvenanceTools(srv *mcpapi.Server, s *Server) {
 }
 
 type getDataSnapshotInput struct {
-	SnapshotID string `json:"snapshot_id" jsonschema:"description=Snapshot ID (required)"`
+	SnapshotID string `json:"snapshot_id" jsonschema:"Snapshot ID (required)"`
 }
 
 type getDataSnapshotOutput struct {
@@ -51,9 +51,9 @@ func getDataSnapshotHandler(s *Server) func(ctx context.Context, req *mcpapi.Cal
 }
 
 type getDataProvenanceInput struct {
-	TransactionID  *string `json:"transaction_id,omitempty" jsonschema:"description=Transaction ID"`
-	ValuationID   *string `json:"valuation_id,omitempty" jsonschema:"description=Valuation result ID"`
-	ParcelID      *string `json:"parcel_id,omitempty" jsonschema:"description=Parcel ID"`
+	TransactionID  *string `json:"transaction_id,omitempty" jsonschema:"Transaction ID"`
+	ValuationID   *string `json:"valuation_id,omitempty" jsonschema:"Valuation result ID"`
+	ParcelID      *string `json:"parcel_id,omitempty" jsonschema:"Parcel ID"`
 }
 
 type getDataProvenanceOutput struct {

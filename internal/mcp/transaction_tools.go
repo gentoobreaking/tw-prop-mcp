@@ -44,15 +44,15 @@ func registerTransactionTools(srv *mcpapi.Server, s *Server) {
 
 // search_transactions input
 type searchTransactionsInput struct {
-	County          string     `json:"county" jsonschema:"description=County (required)"`
-	District        string     `json:"district" jsonschema:"description=District (required)"`
-	Section         string     `json:"section,omitempty" jsonschema:"description=Land section"`
-	LandNumber      string     `json:"land_number,omitempty" jsonschema:"description=Land number"`
-	TransactionType string     `json:"transaction_type,omitempty" jsonschema:"description=Transaction type"`
-	DateFrom        *time.Time `json:"date_from,omitempty" jsonschema:"description=Start date"`
-	DateTo          *time.Time `json:"date_to,omitempty" jsonschema:"description=End date"`
-	Limit           int        `json:"limit,omitempty" jsonschema:"description=Max results (default 100)"`
-	Offset          int        `json:"offset,omitempty" jsonschema:"description=Offset (default 0)"`
+	County          string     `json:"county" jsonschema:"County (required)"`
+	District        string     `json:"district" jsonschema:"District (required)"`
+	Section         string     `json:"section,omitempty" jsonschema:"Land section"`
+	LandNumber      string     `json:"land_number,omitempty" jsonschema:"Land number"`
+	TransactionType string     `json:"transaction_type,omitempty" jsonschema:"Transaction type"`
+	DateFrom        *time.Time `json:"date_from,omitempty" jsonschema:"Start date"`
+	DateTo          *time.Time `json:"date_to,omitempty" jsonschema:"End date"`
+	Limit           int        `json:"limit,omitempty" jsonschema:"Max results (default 100)"`
+	Offset          int        `json:"offset,omitempty" jsonschema:"Offset (default 0)"`
 }
 
 // Output struct for search_transactions
@@ -110,10 +110,10 @@ func searchTransactionsHandler(s *Server) func(ctx context.Context, req *mcpapi.
 }
 
 func getTransactionHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input struct {
-	TransactionID string `json:"transaction_id" jsonschema:"description=Transaction ID (required)"`
+	TransactionID string `json:"transaction_id" jsonschema:"Transaction ID (required)"`
 }) (*mcpapi.CallToolResult, *service.TransactionData, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input struct {
-		TransactionID string `json:"transaction_id" jsonschema:"description=Transaction ID (required)"`
+		TransactionID string `json:"transaction_id" jsonschema:"Transaction ID (required)"`
 	}) (*mcpapi.CallToolResult, *service.TransactionData, error) {
 		if err := checkAIIsolation(req); err != nil {
 			return nil, nil, err
@@ -135,9 +135,9 @@ func getTransactionHandler(s *Server) func(ctx context.Context, req *mcpapi.Call
 }
 
 type getTransactionStatisticsInput struct {
-	County   string `json:"county" jsonschema:"description=County (required)"`
-	District string `json:"district" jsonschema:"description=District (required)"`
-	Section  string `json:"section,omitempty" jsonschema:"description=Land section"`
+	County   string `json:"county" jsonschema:"County (required)"`
+	District string `json:"district" jsonschema:"District (required)"`
+	Section  string `json:"section,omitempty" jsonschema:"Land section"`
 }
 
 func getTransactionStatisticsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getTransactionStatisticsInput) (*mcpapi.CallToolResult, *service.StatisticsResult, error) {

@@ -145,6 +145,11 @@ func (s *Server) RunHTTP(ctx context.Context) error {
 	return httpSrv.ListenAndServe()
 }
 
+// ExposedServer returns the underlying MCP SDK server for testing.
+func (s *Server) ExposedServer() *mcpapi.Server {
+	return s.server
+}
+
 // requestIDMiddleware adds request_id to context for logging.
 func (s *Server) requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -12,21 +12,21 @@ import (
 // --- Parcel Tools ---
 
 type getParcelInput struct {
-	County    string `json:"county" jsonschema:"description=County (required)"`
-	District  string `json:"district" jsonschema:"description=District (required)"`
-	Section   string `json:"section" jsonschema:"description=Land section (required)"`
-	LandNumber string `json:"land_number" jsonschema:"description=Land number (required)"`
+	County    string `json:"county" jsonschema:"County (required)"`
+	District  string `json:"district" jsonschema:"District (required)"`
+	Section   string `json:"section" jsonschema:"Land section (required)"`
+	LandNumber string `json:"land_number" jsonschema:"Land number (required)"`
 }
 
 type searchParcelsInput struct {
-	County       string   `json:"county" jsonschema:"description=County (required)"`
-	District     string   `json:"district" jsonschema:"description=District (required)"`
-	Section      string   `json:"section,omitempty" jsonschema:"description=Land section"`
-	AreaMinSqm   *float64 `json:"area_min_sqm,omitempty" jsonschema:"description=Minimum area in sqm"`
-	AreaMaxSqm   *float64 `json:"area_max_sqm,omitempty" jsonschema:"description=Maximum area in sqm"`
-	UrbanZoning  string   `json:"urban_zoning,omitempty" jsonschema:"description=Urban zoning code"`
-	Limit        int      `json:"limit,omitempty" jsonschema:"description=Max results (default 100)"`
-	Offset       int      `json:"offset,omitempty" jsonschema:"description=Offset (default 0)"`
+	County       string   `json:"county" jsonschema:"County (required)"`
+	District     string   `json:"district" jsonschema:"District (required)"`
+	Section      string   `json:"section,omitempty" jsonschema:"Land section"`
+	AreaMinSqm   *float64 `json:"area_min_sqm,omitempty" jsonschema:"Minimum area in sqm"`
+	AreaMaxSqm   *float64 `json:"area_max_sqm,omitempty" jsonschema:"Maximum area in sqm"`
+	UrbanZoning  string   `json:"urban_zoning,omitempty" jsonschema:"Urban zoning code"`
+	Limit        int      `json:"limit,omitempty" jsonschema:"Max results (default 100)"`
+	Offset       int      `json:"offset,omitempty" jsonschema:"Offset (default 0)"`
 }
 
 func registerParcelTools(srv *mcpapi.Server, s *Server) {
