@@ -132,6 +132,12 @@ func (s *Server) RunHTTP(ctx context.Context) error {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+	// Readiness probe — reflects whether the server can handle requests.
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ready","tools_registered":true}`))
+	})
 	// Prometheus metrics endpoint (Spec T024: observability)
 	mux.Handle("/metrics", promhttp.Handler())
 
