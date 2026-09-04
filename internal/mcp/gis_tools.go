@@ -28,7 +28,7 @@ type getParcelMapContextInput struct {
 }
 
 type checkRoadAccessInput struct {
-	ParcelID      string `json:"parcel_id" jsonschema:"Parcel UUID (required)"`
+	ParcelID      string   `json:"parcel_id" jsonschema:"Parcel UUID (required)"`
 	SearchRadiusM *float64 `json:"search_radius_m,omitempty" jsonschema:"Search radius in meters (default 500)"`
 }
 
@@ -84,19 +84,22 @@ type geometryOutput struct {
 
 func getParcelGeometryHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelGeometryInput) (*mcpapi.CallToolResult, geometryOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelGeometryInput) (*mcpapi.CallToolResult, geometryOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, geometryOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), geometryOutput{}, nil
 		}
 		if input.County == "" || input.District == "" || input.Section == "" || input.LandNumber == "" {
-			return nil, geometryOutput{}, NewError(ErrorCodeInvalidArgument,
-				"county, district, section, and land_number are required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument,
+				"county, district, section, and land_number are required")), geometryOutput{}, nil
 		}
 
 		repo := s.getParcelRepository()
+		if repo == nil {
+			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), geometryOutput{}, nil
+		}
+
 		parcel, err := repo.GetByLandNumber(ctx, input.County, input.District, input.Section, input.LandNumber)
 		if err != nil {
-			return nil, geometryOutput{}, NewError(ErrorCodeParcelNotFound,
-				"parcel not found")
+			return mcpErrorResult(wrapServiceError(err)), geometryOutput{}, nil
 		}
 
 		epsg := input.EPSG
@@ -133,19 +136,22 @@ type locationOutput struct {
 
 func getParcelLocationHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelGeometryInput) (*mcpapi.CallToolResult, locationOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelGeometryInput) (*mcpapi.CallToolResult, locationOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, locationOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), locationOutput{}, nil
 		}
 		if input.County == "" || input.District == "" || input.Section == "" || input.LandNumber == "" {
-			return nil, locationOutput{}, NewError(ErrorCodeInvalidArgument,
-				"county, district, section, and land_number are required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument,
+				"county, district, section, and land_number are required")), locationOutput{}, nil
 		}
 
 		repo := s.getParcelRepository()
+		if repo == nil {
+			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), locationOutput{}, nil
+		}
+
 		parcel, err := repo.GetByLandNumber(ctx, input.County, input.District, input.Section, input.LandNumber)
 		if err != nil {
-			return nil, locationOutput{}, NewError(ErrorCodeParcelNotFound,
-				"parcel not found")
+			return mcpErrorResult(wrapServiceError(err)), locationOutput{}, nil
 		}
 
 		lat, lon := parseCentroid4326(parcel.Centroid4326)
@@ -176,12 +182,12 @@ type roadsOutput struct {
 
 func findNearbyRoadsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelMapContextInput) (*mcpapi.CallToolResult, roadsOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelMapContextInput) (*mcpapi.CallToolResult, roadsOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, roadsOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), roadsOutput{}, nil
 		}
 		if input.County == "" || input.District == "" || input.Section == "" || input.LandNumber == "" {
-			return nil, roadsOutput{}, NewError(ErrorCodeInvalidArgument,
-				"county, district, section, and land_number are required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument,
+				"county, district, section, and land_number are required")), roadsOutput{}, nil
 		}
 
 		return nil, roadsOutput{
@@ -201,8 +207,8 @@ type mapContextOutput struct {
 
 func getParcelMapContextHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelMapContextInput) (*mcpapi.CallToolResult, mapContextOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelMapContextInput) (*mcpapi.CallToolResult, mapContextOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, mapContextOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), mapContextOutput{}, nil
 		}
 
 		lat, lon := 25.0, 121.5 // placeholder for tests
@@ -216,22 +222,26 @@ func getParcelMapContextHandler(s *Server) func(ctx context.Context, req *mcpapi
 }
 
 type roadAccessOutput struct {
-	Status        string  `json:"status"`
-	DistanceM     float64 `json:"distance_m,omitempty"`
+	Status        string   `json:"status"`
+	DistanceM     float64  `json:"distance_m,omitempty"`
 	RoadWidthM    *float64 `json:"road_width_m,omitempty"`
-	Source        string  `json:"source,omitempty"`
+	Source        string   `json:"source,omitempty"`
 }
 
 func checkRoadAccessHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input checkRoadAccessInput) (*mcpapi.CallToolResult, roadAccessOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input checkRoadAccessInput) (*mcpapi.CallToolResult, roadAccessOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, roadAccessOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), roadAccessOutput{}, nil
 		}
 		if input.ParcelID == "" {
-			return nil, roadAccessOutput{}, NewError(ErrorCodeInvalidArgument, "parcel_id is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "parcel_id is required")), roadAccessOutput{}, nil
 		}
 
 		roadRepo := s.getRoadAccessRepository()
+		if roadRepo == nil {
+			return nil, roadAccessOutput{Status: domain.AccessTypeUnknown}, nil
+		}
+
 		access, err := roadRepo.GetByParcelID(ctx, input.ParcelID)
 		if err != nil {
 			// Record not found → return UNKNOWN status (not an error)
@@ -256,7 +266,6 @@ func parseCentroid4326(wkt string) (lat, lon float64) {
 	if wkt == "" {
 		return 0, 0
 	}
-	// Simple WKT POINT(lon lat) parser
 	var x, y float64
 	if _, err := fmt.Sscanf(wkt, "POINT(%f %f)", &x, &y); err == nil {
 		return y, x // lat=y, lon=x

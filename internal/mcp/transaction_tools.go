@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	mcpapi "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -68,15 +69,15 @@ type transactionSearchOutput struct {
 func searchTransactionsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input searchTransactionsInput) (*mcpapi.CallToolResult, transactionSearchOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input searchTransactionsInput) (*mcpapi.CallToolResult, transactionSearchOutput, error) {
 		// AI Isolation check on raw arguments
-		if err := checkAIIsolation(req); err != nil {
-			return nil, transactionSearchOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), transactionSearchOutput{}, nil
 		}
 
 		if input.County == "" {
-			return nil, transactionSearchOutput{}, NewError(ErrorCodeInvalidArgument, "county is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "county is required")), transactionSearchOutput{}, nil
 		}
 		if input.District == "" {
-			return nil, transactionSearchOutput{}, NewError(ErrorCodeInvalidArgument, "district is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "district is required")), transactionSearchOutput{}, nil
 		}
 
 		params := service.SearchParams{
@@ -94,7 +95,7 @@ func searchTransactionsHandler(s *Server) func(ctx context.Context, req *mcpapi.
 		svc := s.getTransactionService()
 		result, err := svc.SearchTransactions(ctx, params)
 		if err != nil {
-			return nil, transactionSearchOutput{}, wrapServiceError(err)
+			return mcpErrorResult(wrapServiceError(err)), transactionSearchOutput{}, nil
 		}
 
 		output := transactionSearchOutput{
@@ -115,20 +116,20 @@ func getTransactionHandler(s *Server) func(ctx context.Context, req *mcpapi.Call
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input struct {
 		TransactionID string `json:"transaction_id" jsonschema:"Transaction ID (required)"`
 	}) (*mcpapi.CallToolResult, *service.TransactionData, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, nil, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), nil, nil
 		}
 		if input.TransactionID == "" {
-			return nil, nil, NewError(ErrorCodeInvalidArgument, "transaction_id is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "transaction_id is required")), nil, nil
 		}
 
 		svc := s.getTransactionService()
 		data, err := svc.GetTransaction(ctx, input.TransactionID)
 		if err != nil {
 			if errors.Is(err, repository.ErrTransactionNotFound) {
-				return nil, nil, NewError(ErrorCodeTransactionNotFound, "transaction not found: "+input.TransactionID)
+				return mcpErrorResult(NewError(ErrorCodeTransactionNotFound, "transaction not found: "+input.TransactionID)), nil, nil
 			}
-			return nil, nil, wrapServiceError(err)
+			return mcpErrorResult(wrapServiceError(err)), nil, nil
 		}
 		return nil, data, nil
 	}
@@ -142,14 +143,14 @@ type getTransactionStatisticsInput struct {
 
 func getTransactionStatisticsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getTransactionStatisticsInput) (*mcpapi.CallToolResult, *service.StatisticsResult, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getTransactionStatisticsInput) (*mcpapi.CallToolResult, *service.StatisticsResult, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, nil, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), nil, nil
 		}
 		if input.County == "" {
-			return nil, nil, NewError(ErrorCodeInvalidArgument, "county is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "county is required")), nil, nil
 		}
 		if input.District == "" {
-			return nil, nil, NewError(ErrorCodeInvalidArgument, "district is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "district is required")), nil, nil
 		}
 
 		params := service.StatisticsParams{
@@ -161,7 +162,7 @@ func getTransactionStatisticsHandler(s *Server) func(ctx context.Context, req *m
 		svc := s.getTransactionService()
 		result, err := svc.GetTransactionStatistics(ctx, params)
 		if err != nil {
-			return nil, nil, wrapServiceError(err)
+			return mcpErrorResult(wrapServiceError(err)), nil, nil
 		}
 
 		return nil, result, nil
@@ -184,7 +185,8 @@ func (s *Server) getTransactionRepository() repository.TransactionRepository {
 
 // checkAIIsolation validates that the raw tool arguments don't contain
 // prohibited fields (sql, where, postgis, etc.).
-func checkAIIsolation(req *mcpapi.CallToolRequest) error {
+// Returns nil if valid, or a *McpError describing the violation.
+func checkAIIsolation(req *mcpapi.CallToolRequest) *McpError {
 	rawArgs := req.Params.Arguments
 	if len(rawArgs) == 0 {
 		return nil
@@ -200,6 +202,19 @@ func checkAIIsolation(req *mcpapi.CallToolRequest) error {
 		}
 	}
 	return nil
+}
+
+// mcpErrorResult converts an McpError into a CallToolResult with IsError=true
+// and the error envelope serialized as JSON text content.
+func mcpErrorResult(mce *McpError) *mcpapi.CallToolResult {
+	content := fmt.Sprintf(`{"error":{"code":"%s","message":"%s","retryable":%t}}`,
+		mce.Code, mce.Message, mce.Retryable)
+	return &mcpapi.CallToolResult{
+		Content: []mcpapi.Content{
+			&mcpapi.TextContent{Text: content},
+		},
+		IsError: true,
+	}
 }
 
 // wrapServiceError converts service errors to MCP errors.

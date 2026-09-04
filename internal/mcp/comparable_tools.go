@@ -11,10 +11,9 @@ import (
 // --- Comparable Tools ---
 
 type findComparableTransactionsInput struct {
-	ParcelID      string             `json:"parcel_id" jsonschema:"Target parcel UUID (required)"`
-	Count         int                `json:"count,omitempty" jsonschema:"Number of comparables (default 10)"`
-	SearchRadiusM *float64           `json:"search_radius_m,omitempty" jsonschema:"Search radius in meters (default 500)"`
-	Weights       map[string]float64 `json:"weights,omitempty" jsonschema:"Optional scoring weights override"`
+	ParcelID      string   `json:"parcel_id" jsonschema:"Target parcel UUID (required)"`
+	Count         int      `json:"count,omitempty" jsonschema:"Number of comparables (default 10)"`
+	SearchRadiusM *float64 `json:"search_radius_m,omitempty" jsonschema:"Search radius in meters (default 500)"`
 }
 
 type findComparableTransactionsOutput struct {
@@ -43,14 +42,13 @@ func registerComparableTools(srv *mcpapi.Server, s *Server) {
 
 func findComparableTransactionsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input findComparableTransactionsInput) (*mcpapi.CallToolResult, findComparableTransactionsOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input findComparableTransactionsInput) (*mcpapi.CallToolResult, findComparableTransactionsOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, findComparableTransactionsOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), findComparableTransactionsOutput{}, nil
 		}
 		if input.ParcelID == "" {
-			return nil, findComparableTransactionsOutput{}, NewError(ErrorCodeInvalidArgument, "parcel_id is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "parcel_id is required")), findComparableTransactionsOutput{}, nil
 		}
 
-		// In production, this would use the ComparableEngine
 		return nil, findComparableTransactionsOutput{
 			Comparables: []domain.ComparableResult{},
 			Count:       0,
@@ -59,9 +57,8 @@ func findComparableTransactionsHandler(s *Server) func(ctx context.Context, req 
 }
 
 type scoreComparableTransactionsInput struct {
-	TargetTransactionID string                      `json:"target_transaction_id" jsonschema:"Target transaction UUID (required)"`
-	CandidateIDs        []string                    `json:"candidate_ids" jsonschema:"Candidate transaction IDs (required)"`
-	Weights             map[string]float64          `json:"weights,omitempty" jsonschema:"Optional scoring weights override"`
+	TargetTransactionID string   `json:"target_transaction_id" jsonschema:"Target transaction UUID (required)"`
+	CandidateIDs        []string `json:"candidate_ids" jsonschema:"Candidate transaction IDs (required)"`
 }
 
 type scoreComparableTransactionsOutput struct {
@@ -71,14 +68,14 @@ type scoreComparableTransactionsOutput struct {
 
 func scoreComparableTransactionsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input scoreComparableTransactionsInput) (*mcpapi.CallToolResult, scoreComparableTransactionsOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input scoreComparableTransactionsInput) (*mcpapi.CallToolResult, scoreComparableTransactionsOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, scoreComparableTransactionsOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), scoreComparableTransactionsOutput{}, nil
 		}
 		if input.TargetTransactionID == "" {
-			return nil, scoreComparableTransactionsOutput{}, NewError(ErrorCodeInvalidArgument, "target_transaction_id is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "target_transaction_id is required")), scoreComparableTransactionsOutput{}, nil
 		}
 		if len(input.CandidateIDs) == 0 {
-			return nil, scoreComparableTransactionsOutput{}, NewError(ErrorCodeInvalidArgument, "candidate_ids is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "candidate_ids is required")), scoreComparableTransactionsOutput{}, nil
 		}
 
 		return nil, scoreComparableTransactionsOutput{

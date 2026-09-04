@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 
 	mcpapi "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -53,26 +54,26 @@ type parcelOutput struct {
 
 func getParcelHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelInput) (*mcpapi.CallToolResult, parcelOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getParcelInput) (*mcpapi.CallToolResult, parcelOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, parcelOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), parcelOutput{}, nil
 		}
 		if input.County == "" || input.District == "" || input.Section == "" || input.LandNumber == "" {
-			return nil, parcelOutput{}, NewError(ErrorCodeInvalidArgument,
-				"county, district, section, and land_number are all required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument,
+				"county, district, section, and land_number are all required")), parcelOutput{}, nil
 		}
 
 		repo := s.getParcelRepository()
 		if repo == nil {
-			return nil, parcelOutput{}, NewError(ErrorCodeInternalError, "parcel repository not configured")
+			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), parcelOutput{}, nil
 		}
 
 		parcel, err := repo.GetByLandNumber(ctx, input.County, input.District, input.Section, input.LandNumber)
 		if err != nil {
-			if err == repository.ErrParcelNotFound {
-				return nil, parcelOutput{}, NewError(ErrorCodeParcelNotFound,
-					"parcel not found: "+input.County+"/"+input.District+"/"+input.Section+"/"+input.LandNumber)
+			if errors.Is(err, repository.ErrParcelNotFound) {
+				return mcpErrorResult(NewError(ErrorCodeParcelNotFound,
+					"parcel not found: "+input.County+"/"+input.District+"/"+input.Section+"/"+input.LandNumber)), parcelOutput{}, nil
 			}
-			return nil, parcelOutput{}, wrapServiceError(err)
+			return mcpErrorResult(wrapServiceError(err)), parcelOutput{}, nil
 		}
 
 		return nil, parcelOutput{Parcel: *parcel}, nil
@@ -88,14 +89,14 @@ type searchParcelsOutput struct {
 
 func searchParcelsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input searchParcelsInput) (*mcpapi.CallToolResult, searchParcelsOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input searchParcelsInput) (*mcpapi.CallToolResult, searchParcelsOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, searchParcelsOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), searchParcelsOutput{}, nil
 		}
 		if input.County == "" {
-			return nil, searchParcelsOutput{}, NewError(ErrorCodeInvalidArgument, "county is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "county is required")), searchParcelsOutput{}, nil
 		}
 		if input.District == "" {
-			return nil, searchParcelsOutput{}, NewError(ErrorCodeInvalidArgument, "district is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "district is required")), searchParcelsOutput{}, nil
 		}
 		if input.Limit <= 0 {
 			input.Limit = 100
@@ -103,7 +104,7 @@ func searchParcelsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallT
 
 		repo := s.getParcelRepository()
 		if repo == nil {
-			return nil, searchParcelsOutput{}, NewError(ErrorCodeInternalError, "parcel repository not configured")
+			return mcpErrorResult(NewError(ErrorCodeInternalError, "parcel repository not configured")), searchParcelsOutput{}, nil
 		}
 
 		var section *string
@@ -121,7 +122,7 @@ func searchParcelsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallT
 		}
 		parcels, err := repo.Search(ctx, filter)
 		if err != nil {
-			return nil, searchParcelsOutput{}, wrapServiceError(err)
+			return mcpErrorResult(wrapServiceError(err)), searchParcelsOutput{}, nil
 		}
 
 		return nil, searchParcelsOutput{

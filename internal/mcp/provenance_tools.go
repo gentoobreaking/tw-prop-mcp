@@ -38,20 +38,19 @@ type getDataSnapshotOutput struct {
 
 func getDataSnapshotHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getDataSnapshotInput) (*mcpapi.CallToolResult, getDataSnapshotOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getDataSnapshotInput) (*mcpapi.CallToolResult, getDataSnapshotOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, getDataSnapshotOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), getDataSnapshotOutput{}, nil
 		}
 		if input.SnapshotID == "" {
-			return nil, getDataSnapshotOutput{}, NewError(ErrorCodeInvalidArgument, "snapshot_id is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument, "snapshot_id is required")), getDataSnapshotOutput{}, nil
 		}
 
-		// In production, this would query the SnapshotRepository
 		return nil, getDataSnapshotOutput{}, nil
 	}
 }
 
 type getDataProvenanceInput struct {
-	TransactionID  *string `json:"transaction_id,omitempty" jsonschema:"Transaction ID"`
+	TransactionID *string `json:"transaction_id,omitempty" jsonschema:"Transaction ID"`
 	ValuationID   *string `json:"valuation_id,omitempty" jsonschema:"Valuation result ID"`
 	ParcelID      *string `json:"parcel_id,omitempty" jsonschema:"Parcel ID"`
 }
@@ -62,12 +61,12 @@ type getDataProvenanceOutput struct {
 
 func getDataProvenanceHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input getDataProvenanceInput) (*mcpapi.CallToolResult, getDataProvenanceOutput, error) {
 	return func(ctx context.Context, req *mcpapi.CallToolRequest, input getDataProvenanceInput) (*mcpapi.CallToolResult, getDataProvenanceOutput, error) {
-		if err := checkAIIsolation(req); err != nil {
-			return nil, getDataProvenanceOutput{}, err
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), getDataProvenanceOutput{}, nil
 		}
 		if input.TransactionID == nil && input.ValuationID == nil && input.ParcelID == nil {
-			return nil, getDataProvenanceOutput{}, NewError(ErrorCodeInvalidArgument,
-				"at least one of transaction_id, valuation_id, or parcel_id is required")
+			return mcpErrorResult(NewError(ErrorCodeInvalidArgument,
+				"at least one of transaction_id, valuation_id, or parcel_id is required")), getDataProvenanceOutput{}, nil
 		}
 
 		return nil, getDataProvenanceOutput{}, nil
