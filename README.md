@@ -274,16 +274,22 @@ docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend frontend/
 ### Run with Docker Compose
 
 ```bash
-# Start PostgreSQL + PostGIS
-docker compose up -d postgres
+# 1. Create .env from template
+cp env.example .env
+# Edit .env — set GOOGLE_MAPS_API_KEY to your real key
 
-# Run server against local database
-docker run -it --network host \
-  -e DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop \
-  -e MCP_HTTP_ADDR=:8080 \
-  -e MCP_TRANSPORT=http \
-  tw-prop-mcp
+# 2. Start all services (postgres → mcp-server → frontend)
+docker compose up -d --build
+
+# 3. Check status
+docker compose ps
 ```
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| PostgreSQL | `localhost:5432` | PostgreSQL 16 + PostGIS |
+| MCP Server | `localhost:8080` | Streamable HTTP on `/mcp`, metrics on `/metrics` |
+| Frontend | `localhost:80` | React + nginx (proxies `/mcp` → MCP Server) |
 
 ## Configuration
 
@@ -536,7 +542,19 @@ make tidy           # go mod tidy
 
 ## Deployment
 
-### Docker
+### Docker Compose (recommended)
+
+```bash
+# One-command dev stack: postgres + MCP server + frontend
+cp env.example .env
+# Edit .env — set GOOGLE_MAPS_API_KEY to your real key
+docker compose up -d --build
+```
+
+Services are started in dependency order (postgres → mcp-server → frontend)
+with health-check gating.  See the service URL table above.
+
+### Docker (standalone)
 
 ```bash
 # Build multi-stage image (golang:1.26-alpine → alpine:latest, non-root)
@@ -544,7 +562,7 @@ docker build -t tw-prop-mcp .
 
 # Run
 docker run -p 8080:8080 \
-  -e DATABASE_URL=postgresql://prop:prop_dev_only@db:5432/prop \
+  -e DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop \
   -e MCP_TRANSPORT=http \
   tw-prop-mcp
 ```
@@ -553,7 +571,8 @@ docker run -p 8080:8080 \
 
 ```bash
 # Build and serve
-docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend .
+docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend . \
+  --build-arg VITE_GOOGLE_MAPS_API_KEY=your_key_here
 docker run -p 80:80 tw-prop-mcp-frontend
 ```
 

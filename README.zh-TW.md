@@ -257,16 +257,22 @@ docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend frontend/
 ### 使用 Docker Compose 啟動
 
 ```bash
-# 啟動 PostgreSQL + PostGIS
-docker compose up -d postgres
+# 1. 從模板建立 .env
+cp env.example .env
+# 編輯 .env — 填入您的 GOOGLE_MAPS_API_KEY
 
-# 啟動伺服器 (連接本地資料庫)
-docker run -it --network host \
-  -e DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop \
-  -e MCP_HTTP_ADDR=:8080 \
-  -e MCP_TRANSPORT=http \
-  tw-prop-mcp
+# 2. 啟動所有服務 (postgres → mcp-server → frontend)
+docker compose up -d --build
+
+# 3. 檢查狀態
+docker compose ps
 ```
+
+| 服務 | URL | 說明 |
+|------|-----|------|
+| PostgreSQL | `localhost:5432` | PostgreSQL 16 + PostGIS |
+| MCP Server | `localhost:8080` | Streamable HTTP on `/mcp`，metrics on `/metrics` |
+| Frontend | `localhost:80` | React + nginx (代理 `/mcp` → MCP Server) |
 
 ## 配置
 
@@ -511,7 +517,18 @@ make tidy           # go mod tidy
 
 ## 部署
 
-### Docker
+### Docker Compose (推薦)
+
+```bash
+# 一鍵啟動開發環境：postgres + MCP server + frontend
+cp env.example .env
+# 編輯 .env — 填入您的 GOOGLE_MAPS_API_KEY
+docker compose up -d --build
+```
+
+服務依序啟動 (postgres → mcp-server → frontend)，並透過健康檢查控管依賴順序。
+
+### Docker (單獨執行)
 
 ```bash
 # 多階段建置 (golang:1.26-alpine → alpine:latest, 非 root)
@@ -519,7 +536,7 @@ docker build -t tw-prop-mcp .
 
 # 執行
 docker run -p 8080:8080 \
-  -e DATABASE_URL=postgresql://prop:prop_dev_only@db:5432/prop \
+  -e DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop \
   -e MCP_TRANSPORT=http \
   tw-prop-mcp
 ```
@@ -528,7 +545,8 @@ docker run -p 8080:8080 \
 
 ```bash
 # 建置與提供服務
-docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend .
+docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend . \
+  --build-arg VITE_GOOGLE_MAPS_API_KEY=your_key_here
 docker run -p 80:80 tw-prop-mcp-frontend
 ```
 

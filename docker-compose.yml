@@ -1,3 +1,7 @@
+# docker-compose.yml — complete dev stack: postgres + MCP server + frontend
+# Requires .env file (see .env.example) with secrets like POSTGRES_PASSWORD
+# and GOOGLE_MAPS_API_KEY.  Compose auto-loads .env for ${VAR} substitution.
+
 services:
   tw-prop-postgres:
     build:
@@ -7,9 +11,9 @@ services:
     container_name: tw-prop-postgres
     hostname: tw-prop-postgres
     environment:
-      POSTGRES_USER: prop
-      POSTGRES_PASSWORD: prop_dev_only
-      POSTGRES_DB: prop
+      POSTGRES_USER: ${POSTGRES_USER:-prop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prop_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-prop}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
     ports:
       - "5432:5432"
@@ -21,4 +25,43 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tw-prop-mcp:latest
+    container_name: tw-prop-mcp
+    hostname: mcp-server
+    depends_on:
+      tw-prop-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-http}
+      MCP_HTTP_ADDR: ${MCP_HTTP_ADDR:-:8080}
+      DEFAULT_SNAPSHOT_VERSION: latest
+      ALGORITHM_VERSION: comparable-v2.0
+      CONFIGURATION_VERSION: v2.0
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+        VITE_MCP_SERVER_URL: ${VITE_MCP_SERVER_URL:-/mcp}
+    image: tw-prop-mcp-frontend:latest
+    container_name: tw-prop-mcp-frontend
+    hostname: frontend
+    depends_on:
+      mcp-server:
+        condition: service_started
+    ports:
+      - "80:80"
     restart: unless-stopped
