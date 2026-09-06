@@ -4,7 +4,7 @@
  */
 import { useEffect, useCallback, useRef, RefObject } from 'react';
 import L from 'leaflet';
-import type { ViewData, ParcelGeometry, Transaction, RoadSegment, MapContext } from '../types';
+import type { ViewData } from '../types';
 
 interface UseLeafletMapOptions {
   mapRef: RefObject<HTMLDivElement>;
@@ -93,6 +93,7 @@ export function useLeafletMap({ mapRef, data, showSatellite, showStreetView, sho
       console.error('[Leaflet] Failed to initialize map:', err);
       window.dispatchEvent(new CustomEvent('map-error', { detail: { error: msg } }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapRef, showSatellite, showNLSC]);
 
   // Update layer visibility based on toggle changes

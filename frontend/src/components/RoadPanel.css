@@ -1,0 +1,125 @@
+.road-panel {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.road-loading,
+.road-error {
+  padding: 1rem;
+  text-align: center;
+}
+
+.road-loading {
+  color: #6b7280;
+}
+
+.road-error {
+  color: #dc2626;
+}
+
+.road-section {
+  margin-bottom: 1rem;
+}
+
+.road-section-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  color: #374151;
+  font-weight: 600;
+}
+
+.road-sub-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+.road-adjacency {
+  padding: 0.5rem 0;
+}
+
+.adjacency-badge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.road-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.road-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.road-info-label {
+  color: #6b7280;
+  flex: 1;
+}
+
+.road-info-value {
+  color: #1f2937;
+  font-weight: 500;
+  flex: 1;
+  text-align: right;
+}
+
+.road-info-source {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  flex: 2;
+}
+
+.nearby-roads {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.nearby-road-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0.5rem;
+  background: #f9fafb;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.nearby-road-name {
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.nearby-road-distance {
+  color: #6b7280;
+}
+
+.nearby-road-width {
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.street-view-button {
+  padding: 0.5rem 1rem;
+  background: #1a1a2e;
+  color: #e94560;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.street-view-button:hover {
+  background: #16213e;
+}

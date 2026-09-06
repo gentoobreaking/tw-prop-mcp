@@ -1,64 +1,74 @@
-import { useState, useEffect, useCallback } from 'react';
-import * as mcpApi from '../services/mcpApi';
+/**
+ * Backward-compatible wrapper around useAppState.
+ * Delegates to the unified state management hook.
+ */
+
+import { useAppState } from './useAppState';
 import type { ViewData } from '../types';
 
-interface UseMCPResult {
+export { useAppState } from './useAppState';
+
+/**
+ * Legacy hook interface for components still using the old shape.
+ * Returns a minimal ViewData-like object from the current app state.
+ */
+export function useMCP(): {
   data: ViewData | null;
   loading: boolean;
   error: string | null;
   refresh: () => void;
   clearError: () => void;
-}
+} {
+  const appState = useAppState();
 
-/**
- * Hook that loads all map view data from the MCP server.
- * Frontend only fetches structured data via MCP tools — no direct DB access.
- */
-export function useMCP(): UseMCPResult {
-  const [data, setData] = useState<ViewData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const data: ViewData | null = appState.selectedParcel
+    ? {
+        parcel: appState.selectedParcel,
+        transactions: appState.transactions,
+        roads: appState.roadAccess
+          ? [
+              {
+                road_id: '',
+                name: '',
+                width_source: appState.roadAccess.source ?? 'unknown',
+                geometry: { type: 'MultiLineString', coordinates: [] },
+                distance_m: appState.roadAccess.distance_m,
+                access_type: (appState.roadAccess.status as
+                  | 'ROAD_ADJACENT'
+                  | 'ROAD_NEARBY'
+                  | 'NO_ROAD_DETECTED'
+                  | 'UNKNOWN') ?? 'UNKNOWN',
+              },
+            ]
+          : [],
+        comparables: appState.comparables,
+        valuation: appState.valuation,
+        map_context: appState.mapContext,
+        metadata: appState.provenance.parcel
+          ? {
+              algorithm_version: '',
+              snapshot_id: appState.provenance.parcel.snapshot_id ?? '',
+              generatedAt: '',
+              query_hash: appState.provenance.parcel.query_hash ?? '',
+            }
+          : {
+              algorithm_version: '',
+              snapshot_id: '',
+              generatedAt: '',
+              query_hash: '',
+            },
+      }
+    : null;
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // TODO: Replace with actual user-selected parcel params from URL or UI
-      // For now, load default view or wait for user interaction
-      const viewData = await mcpApi.loadMapView({
-        county: '臺北市',
-        district: '中正區',
-        section: '八德段',
-        landNumber: '001-002-003',
-      });
-      setData(viewData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const refresh = useCallback(() => {
-    void loadData();
-  }, [loadData]);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  useEffect(() => {
-    // Use runtime-config injected URL, fallback to build-time env
-    const runtimeUrl = (typeof window !== 'undefined' &&
-      (window as unknown as { RUNTIME_CONFIG?: { MCP_SERVER_URL?: string } }).RUNTIME_CONFIG?.MCP_SERVER_URL) ||
-      import.meta.env.VITE_MCP_SERVER_URL;
-    if (runtimeUrl) {
-      void loadData();
-    } else {
-      setLoading(false);
-      setError('MCP server URL not configured. Set MCP_SERVER_URL in runtime config.');
-    }
-  }, [loadData]);
-
-  return { data, loading, error, refresh, clearError };
+  return {
+    data,
+    loading: appState.parcelLoading || appState.searchLoading,
+    error: appState.parcelError || appState.systemError,
+    refresh: () => {
+      if (appState.selectedParcelIdentity) {
+        void appState.loadParcel(appState.selectedParcelIdentity);
+      }
+    },
+    clearError: appState.clearAllErrors,
+  };
 }

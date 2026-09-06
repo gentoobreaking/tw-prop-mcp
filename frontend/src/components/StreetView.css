@@ -1,0 +1,30 @@
+.street-view-panel {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  background: #000;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.street-view-loading,
+.street-view-unavailable,
+.street-view-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 1rem;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.street-view-unavailable {
+  color: #dc2626;
+}
+
+.street-view-container {
+  width: 100%;
+  height: 100%;
+}

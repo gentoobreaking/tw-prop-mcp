@@ -1,0 +1,152 @@
+.parcel-inspector {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.parcel-loading,
+.parcel-error,
+.parcel-empty {
+  padding: 2rem;
+  text-align: center;
+}
+
+.parcel-loading .loading-spinner {
+  color: #6b7280;
+}
+
+.parcel-error h3 {
+  color: #dc2626;
+  margin-bottom: 0.5rem;
+}
+
+.parcel-empty p {
+  color: #6b7280;
+}
+
+.parcel-empty-hint {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.inspector-section {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.inspector-section:last-child {
+  border-bottom: none;
+}
+
+.inspector-section-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.inspector-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.inspector-nav {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.inspector-nav:hover {
+  text-decoration: underline;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.375rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.info-label {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.info-value {
+  font-size: 0.85rem;
+  color: #1f2937;
+  font-weight: 500;
+  text-align: right;
+}
+
+.info-row.highlight .info-value {
+  color: #1e88e5;
+  font-weight: 700;
+}
+
+.warning {
+  color: #ca8a04;
+}
+
+.area-warning {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.inspector-empty {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+}
+
+.comparable-summary {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.comparable-score,
+.comparable-distance {
+  color: #4b5563;
+}
+
+.insufficient-data {
+  color: #ca8a04;
+  padding: 0.5rem 0;
+}
+
+.insufficient-data p {
+  margin: 0;
+}
+
+.provenance-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.provenance-summary .provenance-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.provenance-summary .provenance-row .info-label {
+  font-size: 0.75rem;
+}
+
+.provenance-summary .provenance-row .info-value {
+  font-size: 0.8rem;
+  font-family: monospace;
+}

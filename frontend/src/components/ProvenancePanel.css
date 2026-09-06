@@ -1,0 +1,107 @@
+.provenance-panel {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 1rem;
+}
+
+.provenance-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.provenance-toggle:hover {
+  background: #f3f4f6;
+}
+
+.provenance-chevron {
+  transition: transform 0.2s ease;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.provenance-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.provenance-content {
+  padding: 0.75rem;
+}
+
+.provenance-section {
+  margin-bottom: 1rem;
+}
+
+.provenance-section:last-child {
+  margin-bottom: 0;
+}
+
+.provenance-section-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.provenance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+}
+
+.provenance-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.provenance-label {
+  color: #9ca3af;
+}
+
+.provenance-value {
+  color: #1f2937;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}
+
+.provenance-hash {
+  font-size: 0.72rem;
+  background: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.provenance-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.provenance-chain-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.chain-arrow {
+  flex-shrink: 0;
+}
+
+.arrow {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.provenance-info {
+  flex: 1;
+}

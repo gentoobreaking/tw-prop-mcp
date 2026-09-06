@@ -97,3 +97,28 @@ export function computeUnionBounds(points: LatLng[]): LatLngBounds | null {
     southwest: { lat: minLat, lng: minLng },
   };
 }
+
+/** Extract the first ring of the first polygon from a parcel geometry (single path) */
+export function parcelGeometryToPath(parcel: ParcelGeometry): LatLng[] {
+  const paths = parcelGeometryToPaths(parcel);
+  return paths[0] ?? [];
+}
+
+/** Compute bounding box from a parcel geometry */
+export function parcelGeometryToBounds(parcel: ParcelGeometry): LatLngBounds {
+  const paths = parcelGeometryToPaths(parcel);
+  const allPoints = paths.flat();
+  const bounds = computeUnionBounds(allPoints);
+  if (!bounds) {
+    return {
+      northeast: { lat: 0, lng: 0 },
+      southwest: { lat: 0, lng: 0 },
+    };
+  }
+  return bounds;
+}
+
+/** Convert a single transaction to a marker LatLng position */
+export function transactionToMarker(tx: Transaction): LatLng | null {
+  return tx.location ?? null;
+}

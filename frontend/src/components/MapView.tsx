@@ -1,3 +1,13 @@
+/**
+ * MapView — map workspace component.
+ *
+ * Per SPEC §10-12: supports pan, zoom, parcel boundary, selection, layer control.
+ * Per SPEC §12.1: clicking a parcel identifies it and opens the Parcel Inspector.
+ * Per SPEC §14: map ↔ list synchronization.
+ *
+ * Works with both Google Maps (provider='google') and Leaflet (provider='leaflet').
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { useMap as useGoogleMap } from '../hooks/useMap';
@@ -9,11 +19,11 @@ import type {
   RoadSegment,
   ComparableResult,
   MapContext,
-  ResponseMetadata,
-  ViewData,
 } from '../types';
 import { LeafletParcelLayer } from './LeafletParcelLayer';
 import { LeafletRoadLayer } from './LeafletRoadLayer';
+import { LeafletComparableLayer } from './LeafletComparableLayer';
+import { ComparableLayer } from './ComparableLayer';
 import { LeafletTransactionMarkers } from './LeafletTransactionMarkers';
 import { ParcelLayer } from './ParcelLayer';
 import { RoadLayer } from './RoadLayer';
@@ -29,6 +39,9 @@ interface MapViewProps {
   showSatellite: boolean;
   showStreetView: boolean;
   showNLSC: boolean;
+  showRoads: boolean;
+  showComparables: boolean;
+  showTransactions: boolean;
   mapContext?: MapContext;
 }
 
@@ -44,6 +57,9 @@ const MapView: React.FC<MapViewProps> = ({
   showSatellite,
   showStreetView,
   showNLSC,
+  showRoads,
+  showComparables,
+  showTransactions,
   mapContext,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -113,8 +129,11 @@ const MapView: React.FC<MapViewProps> = ({
     return (
       <>
         <ParcelLayer google={googleApi} map={googleMapRef} parcel={parcel} />
-        <RoadLayer google={googleApi} map={googleMapRef} roads={roads} />
-        <TransactionMarkers google={googleApi} map={googleMapRef} transactions={transactions} />
+        {showRoads && <RoadLayer google={googleApi} map={googleMapRef} roads={roads} />}
+        {showTransactions && (
+          <TransactionMarkers google={googleApi} map={googleMapRef} transactions={transactions} />
+        )}
+        {comparables && <ComparableLayer google={googleApi} map={googleMapRef} comparables={comparables} />}
       </>
     );
   };
@@ -125,8 +144,11 @@ const MapView: React.FC<MapViewProps> = ({
     return (
       <>
         <LeafletParcelLayer map={leafletMap} parcel={parcel ?? null} />
-        <LeafletRoadLayer map={leafletMap} roads={roads} />
-        <LeafletTransactionMarkers map={leafletMap} transactions={transactions} />
+        {showRoads && <LeafletRoadLayer map={leafletMap} roads={roads} />}
+        {showTransactions && (
+          <LeafletTransactionMarkers map={leafletMap} transactions={transactions} />
+        )}
+        {showComparables && <LeafletComparableLayer map={leafletMap} comparables={comparables} />}
       </>
     );
   };
@@ -143,7 +165,9 @@ const MapView: React.FC<MapViewProps> = ({
 
   return (
     <div className="map-container">
-      {MAP_PROVIDER === 'google' && !isLoaded && <div className="map-loading">Loading map…</div>}
+      {loading && MAP_PROVIDER === 'google' && !isLoaded && (
+        <div className="map-loading">Loading map…</div>
+      )}
       <div ref={mapRef} className="map-canvas" />
       {renderGoogleLayers()}
       {renderLeafletLayers()}
