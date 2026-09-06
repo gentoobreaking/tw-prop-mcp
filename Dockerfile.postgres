@@ -1,2 +1,4 @@
-FROM postgres:16-bullseye
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-16-postgis-3 postgresql-16-postgis-3-scripts && rm -rf /var/lib/apt/lists/*
+# Official PostGIS image with arm64 support (Alpine 3.22, PostGIS 3.6, PostgreSQL 16)
+FROM imresamu/postgis:16-3.6-alpine3.22
+
+# PostGIS is already installed and configured

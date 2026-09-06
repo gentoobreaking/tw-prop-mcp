@@ -55,7 +55,7 @@ tw-prop-mcp 透過 [Model Context Protocol (MCP)](https://spec.modelcontextproto
 ### 組件架構
 
 | 層級 | 套件 | 職責 |
-|------|------|------|
+| ------ | ------ | ------ |
 | 入口點 | `cmd/realestate-mcp/main.go` | CLI flags、環境變數解析、OTel 初始化、伺服器啟動 |
 | MCP 接口 | `internal/mcp/` | 17 個 tools、5 個 resources、3 個 prompts、AI 隔離、可觀測性、錯誤模型 |
 | 服務層 | `internal/service/`, `internal/valuation/`, `internal/statistics/` | 商業邏輯：可比評分、統計、道路臨接判定 |
@@ -70,27 +70,31 @@ tw-prop-mcp 透過 [Model Context Protocol (MCP)](https://spec.modelcontextproto
 ### 17 個 MCP Tools
 
 #### 交易工具 (`internal/mcp/transaction_tools.go`)
+
 | Tool | 說明 |
-|------|------|
+| ------ | ------ |
 | `search_transactions` | 依照縣市/鄉鎮/段、價格範圍、日期範圍搜尋 |
 | `get_transaction` | 取得單筆交易明細（依 UUID） |
 | `get_transaction_statistics` | 取得區域統計指標（Min/P25/中位數/平均/P75/P90/Max） |
 
 #### 地號工具 (`internal/mcp/parcel_tools.go`)
+
 | Tool | 說明 |
 |------|------|
 | `get_parcel` | 取得地號詳情（依 UUID） |
 | `search_parcels` | 依段名+地號搜尋 |
 
 #### 可比交易工具 (`internal/mcp/comparable_tools.go`)
+
 | Tool | 說明 |
 |------|------|
 | `find_comparable_transactions` | 尋找並評分可比交易 |
 | `score_comparable_transactions` | 對指定交易進行可比評分 |
 
 #### GIS 工具 (`internal/mcp/gis_tools.go`)
+
 | Tool | 說明 |
-|------|------|
+| ------ | ------ |
 | `get_parcel_geometry` | WKT 幾何資料 (EPSG:4326) |
 | `get_parcel_location` | 中心點、包圍盒、座標 |
 | `check_road_access` | 道路臨接分類（4 種類型） |
@@ -98,19 +102,22 @@ tw-prop-mcp 透過 [Model Context Protocol (MCP)](https://spec.modelcontextproto
 | `get_parcel_map_context` | 整合地號+道路+可比交易的地圖顯示資料 |
 
 #### 估價工具 (`internal/mcp/valuation_tools.go`)
+
 | Tool | 說明 |
-|------|------|
+| ------ | ------ |
 | `estimate_land_value` | 熊/熱/牛三象限估價 + 信心度 |
 | `estimate_property_value` | 土地+建物估價 |
 | `explain_valuation` | 人類可讀的估價說明 |
 
 #### 資料溯源工具 (`internal/mcp/provenance_tools.go`)
+
 | Tool | 說明 |
 |------|------|
 | `get_data_snapshot` | 資料快照資訊（來源、版本、記錄數、狀態） |
 | `get_data_provenance` | 任意結果的完整溯源鏈 |
 
 ### 5 個 MCP Resources (`internal/mcp/resources.go`)
+
 - `realestate://snapshot/{snapshot_id}` — 資料快照 metadata
 - `realestate://transaction/{transaction_id}` — 交易 provenance
 - `realestate://parcel/{parcel_id}` — 地號幾何 + 所有權
@@ -118,13 +125,15 @@ tw-prop-mcp 透過 [Model Context Protocol (MCP)](https://spec.modelcontextproto
 - `realestate://algorithm/{version}` — 演算法設定 + 權重
 
 ### 3 個 MCP Prompts (`internal/mcp/prompts.go`)
+
 | Prompt | 用途 |
-|--------|------|
+| -------- | ------ |
 | `prompt_explain_valuation` | 呼叫 `estimate_land_value` 後解釋估價方法論 |
 | `prompt_analyze_comparables` | 結構化可比交易分析報告 |
 | `prompt_debug_transaction` | 診斷意外的查詢結果 |
 
 ### 資料管線 (`internal/importpipeline/pipeline.go`)
+
 1. **下載** — 從 MOI 取得 CSV (`--auto` 自動抓取最新 URL)
 2. **驗證校驗和** — SHA256 驗證原始檔案
 3. **解析** — CSV → 中介資料列 (`internal/parser/`)
@@ -136,6 +145,7 @@ tw-prop-mcp 透過 [Model Context Protocol (MCP)](https://spec.modelcontextproto
 9. **鎖定** — 快照狀態切換為 LOCKED (不可變)
 
 ### 關鍵原則
+
 - **確定性**: 查詢雜湊 = `canonicalize(snapshot_id, query_params, algorithm_version, config_version)`
 - **AI 隔離**: `ProhibitedFields` 驗證所有工具輸入，拒絕 `sql`、`where`、`postgis`、`valuation_formula`、`weights` (P4)
 - **Artifact 鎖定**: migrations 002-004 建立資料庫層級 trigger，強制執行快照/設定/原始資料的不可變性 (P5)
@@ -218,11 +228,13 @@ tw-prop-mcp/
 ## 環境需求
 
 ### Runtime
+
 - **Go**: 1.26+
 - **PostgreSQL**: 16+ (需安裝 PostGIS 3.5 擴充套件)
 - **作業系統**: 任意 (Docker 建議用于 PostgreSQL)
 
 ### 外部服務
+
 - **內政部實價登錄**: `https://plvr.land.moi.gov.tw/` — 資料來源
 - **OpenTelemetry Collector** (選用): 透過 `OTEL_EXPORTER_OTLP_ENDPOINT` 收集追蹤/指標
 - **Google Maps API** (前端專用): 前端地圖渲染所需
@@ -269,7 +281,7 @@ docker compose ps
 ```
 
 | 服務 | URL | 說明 |
-|------|-----|------|
+| ------ | ----- | ------ |
 | PostgreSQL | `localhost:5432` | PostgreSQL 16 + PostGIS |
 | MCP Server | `localhost:8080` | Streamable HTTP on `/mcp`，metrics on `/metrics` |
 | Frontend | `localhost:80` | React + nginx (代理 `/mcp` → MCP Server) |
@@ -279,7 +291,7 @@ docker compose ps
 ### 伺服器環境變數
 
 | 變數 | 預設值 | 說明 |
-|------|--------|------|
+| ------ | -------- | ------ |
 | `MCP_TRANSPORT` | `http` | 傳輸方式：`stdio` 或 `http` |
 | `MCP_HTTP_ADDR` | `:8080` | HTTP 監聽位址 (HTTP 模式) |
 | `DATABASE_URL` | — | PostgreSQL 連接字串 (`postgresql://user:pass@host:5432/db`) |
@@ -293,7 +305,7 @@ docker compose ps
 ### CLI Flags
 
 | Flag | Env Var | 預設值 | 說明 |
-|------|---------|--------|------|
+| ------ | --------- | -------- | ------ |
 | `--transport` | `MCP_TRANSPORT` | `http` | `stdio` 或 `http` |
 | `--addr` | `MCP_HTTP_ADDR` | `:8080` | HTTP 監聽位址 |
 | `--snapshot-id` | `DEFAULT_SNAPSHOT_VERSION` | `latest` | 預設資料快照 |
@@ -366,6 +378,7 @@ curl -X POST http://localhost:8080/mcp \
 ### 工具 Schema
 
 所有工具使用 `mcpapi.AddTool` 泛型提供型別安全的輸入/輸出。每次回應都包含 `metadata`：
+
 - `query_hash` — 確定性雜湊值
 - `snapshot_id` — 資料來源快照版本
 - `algorithm_version` — 使用的演算法
@@ -374,7 +387,7 @@ curl -X POST http://localhost:8080/mcp \
 ### 錯誤模型 (`internal/mcp/errors.go`)
 
 | 代碼 | 說明 |
-|------|------|
+| ------ | ------ |
 | `INVALID_ARGUMENT` | 參數驗證失敗 |
 | `PARCEL_NOT_FOUND` | 地號 UUID 不存在 |
 | `TRANSACTION_NOT_FOUND` | 交易 UUID 不存在 |
@@ -405,10 +418,13 @@ blockedFields := []string{"sql", "where", "postgis", "valuation_formula", "weigh
 - **ComparableCandidate**: 帶分數的交易資料，包含 `area_similarity`、`distance_meters`、`time_weight`、`zoning_match`、`land_use_match`、`road_access_match`
 
 ### 地號身份識別 (4-key)
+
 一個地號由 `county + district + section + land_number` 唯一識別。
 
 ### 統計計算
+
 `statistics/engine.go` 提供：
+
 - 百分位數：P0/P10/P25/中位數/平均/P75/P90/P100
 - 離群值：IQR 方法 (可設定 k 因子)
 - 面積換算：1 坪 = 3.305785 平方公尺
@@ -434,6 +450,7 @@ blockedFields := []string{"sql", "where", "postgis", "valuation_formula", "weigh
 ## 日誌與可觀測性
 
 ### Prometheus Metrics (`internal/mcp/observability.go`)
+
 - `mcp_requests_total` — 各工具請求計數器
 - `mcp_request_duration_seconds` — 各工具耗時直方圖
 - `transaction_query_total` — 交易查詢計數器
@@ -444,16 +461,19 @@ blockedFields := []string{"sql", "where", "postgis", "valuation_formula", "weigh
 - `snapshot_locked_total` — 快照鎖定計數器
 
 ### OpenTelemetry
+
 - 透過 `OTEL_EXPORTER_OTLP_ENDPOINT` (預設 `http://localhost:4318`) 設定 OTLP HTTP exporter
 - 使用 `BatchSpanProcessor` 緩衝匯出
 - 服務名稱: `tw-prop-mcp`
 - 未設定 endpoint 時自動降grade 為 no-op tracer
 
 ### 結構化日誌
+
 - 每請求紀錄 `request_id`、`tool_name`、`snapshot_id`、`query_hash`
 - 匯入管線記錄各階段結構化日誌
 
 ### HTTP 端點 (HTTP 模式)
+
 - `/mcp` — MCP Streamable HTTP 端點
 - `/healthz` — liveness probe
 - `/readyz` — readiness probe
@@ -496,6 +516,7 @@ bash scripts/verify.sh  # 16 步驟驗證
 ```
 
 ### 測試統計
+
 - 單元測試: 244 個通過 (2 個 config 測試在無 PostgreSQL container 時失敗)
 - 整合測試: 10 個通過
 - E2E: 7 個通過
@@ -551,6 +572,7 @@ docker run -p 80:80 tw-prop-mcp-frontend
 ```
 
 ### 健康檢查
+
 - `GET /healthz` — liveness (永遠回傳 200)
 - `GET /readyz` — readiness (回傳 `{"status":"ready"}`)
 - `GET /metrics` — Prometheus metrics
@@ -568,11 +590,13 @@ docker run -p 80:80 tw-prop-mcp-frontend
 5. 添加到 `tests/contract/contract_test.go`
 
 ### 程式碼規範
+
 - `gofmt` / `goimports` 格式化
 - `golangci-lint` 靜態分析
 - 測試覆蓋率目標: ≥ 80%
 
 ### Git 規範
+
 - Conventional Commits (`feat:`, `fix:`, `docs:` 等)
 - 一個任務一個 commit
 - `main` 分支受保護

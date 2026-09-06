@@ -7,7 +7,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.postgres
-    image: tw-prop-postgres:16-alpine-postgis
+    image: tw-prop-postgres:latest
     container_name: tw-prop-postgres
     hostname: tw-prop-postgres
     environment:
@@ -19,6 +19,7 @@ services:
       - "5432:5432"
     volumes:
       - ./pg_data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prop -d prop"]
       interval: 5s
@@ -27,13 +28,13 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  mcp-server:
+  tw-prop-mcp:
     build:
       context: .
       dockerfile: Dockerfile
     image: tw-prop-mcp:latest
     container_name: tw-prop-mcp
-    hostname: mcp-server
+    hostname: tw-prop-mcp
     depends_on:
       tw-prop-postgres:
         condition: service_healthy
@@ -49,18 +50,20 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
-  frontend:
+  tw-prop-frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
       args:
         VITE_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
-        VITE_MCP_SERVER_URL: ${VITE_MCP_SERVER_URL:-/mcp}
-    image: tw-prop-mcp-frontend:latest
-    container_name: tw-prop-mcp-frontend
-    hostname: frontend
+    environment:
+      MCP_SERVER_URL: ${MCP_SERVER_URL:-/mcp}
+      MAP_PROVIDER: ${MAP_PROVIDER:-leaflet}
+    image: tw-prop-frontend:latest
+    container_name: tw-prop-frontend
+    hostname: tw-prop-frontend
     depends_on:
-      mcp-server:
+      tw-prop-mcp:
         condition: service_started
     ports:
       - "80:80"

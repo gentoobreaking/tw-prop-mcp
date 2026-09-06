@@ -5,10 +5,14 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useMCP } from './hooks/useMCP';
 import './App.css';
 
+const MAP_PROVIDER = (typeof window !== 'undefined' &&
+  (window as unknown as { RUNTIME_CONFIG?: { MAP_PROVIDER?: string } }).RUNTIME_CONFIG?.MAP_PROVIDER) ||
+  'leaflet';
+
 const App: React.FC = () => {
   const { data, loading, error, clearError } = useMCP();
-  const [showStreetView, setShowStreetView] = useState(false);
   const [showSatellite, setShowSatellite] = useState(false);
+  const [showStreetView, setShowStreetView] = useState(false);
   const [showNLSC, setShowNLSC] = useState(false);
 
   useEffect(() => {
@@ -58,14 +62,16 @@ const App: React.FC = () => {
                 />
                 NLSC Cadastral
               </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={showStreetView}
-                  onChange={(e) => setShowStreetView(e.target.checked)}
-                />
-                Street View
-              </label>
+              {MAP_PROVIDER === 'google' && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showStreetView}
+                    onChange={(e) => setShowStreetView(e.target.checked)}
+                  />
+                  Street View
+                </label>
+              )}
             </div>
 
             {data && (

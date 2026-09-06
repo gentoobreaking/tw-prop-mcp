@@ -57,10 +57,13 @@ export function useMap({ mapRef, data, showSatellite, showStreetView, showNLSC }
   }, [mapRef, showSatellite, showStreetView, showNLSC]);
 
   useEffect(() => {
-    if (data && mapRef.current) {
+    const MAP_PROVIDER = (typeof window !== 'undefined' &&
+      (window as unknown as { RUNTIME_CONFIG?: { MAP_PROVIDER?: string } }).RUNTIME_CONFIG?.MAP_PROVIDER) ||
+      'leaflet';
+    if (MAP_PROVIDER === 'google' && data && mapRef.current) {
       void initializeMap();
     }
-  }, [showSatellite, showStreetView, showNLSC, data, initializeMap, mapRef]);
+  }, [showSatellite, showStreetView, showNLSC, data, initializeMap, mapRef])
 
   return { initializeMap };
 }

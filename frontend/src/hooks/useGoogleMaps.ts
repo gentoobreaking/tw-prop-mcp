@@ -11,8 +11,15 @@ export function useGoogleMaps(): UseGoogleMapsResult {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const MAP_PROVIDER = (typeof window !== 'undefined' &&
+      (window as unknown as { RUNTIME_CONFIG?: { MAP_PROVIDER?: string } }).RUNTIME_CONFIG?.MAP_PROVIDER) ||
+      'leaflet';
+    // Skip Google Maps init if provider is leaflet
+    if (MAP_PROVIDER === 'leaflet') {
+      setIsLoaded(true);
+      return;
+    }
     let cancelled = false;
-
     loadGoogleMapsWithRetry()
       .then(() => {
         if (!cancelled) {
@@ -26,7 +33,6 @@ export function useGoogleMaps(): UseGoogleMapsResult {
           setIsLoaded(false);
         }
       });
-
     return () => {
       cancelled = true;
     };
