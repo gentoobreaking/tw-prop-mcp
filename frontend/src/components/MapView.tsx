@@ -128,7 +128,7 @@ const MapView: React.FC<MapViewProps> = ({
     if (MAP_PROVIDER !== 'google' || !isLoaded || !googleMapRef || !googleApi || !parcel) return null;
     return (
       <>
-        <ParcelLayer google={googleApi} map={googleMapRef} parcel={parcel} />
+        <ParcelLayer google={googleApi} map={googleMapRef} geometry={parcel ?? null} />
         {showRoads && <RoadLayer google={googleApi} map={googleMapRef} roads={roads} />}
         {showTransactions && (
           <TransactionMarkers google={googleApi} map={googleMapRef} transactions={transactions} />
