@@ -11,23 +11,35 @@ export const LeafletParcelLayer: React.FC<LeafletParcelLayerProps> = ({ map, par
   React.useEffect(() => {
     if (!parcel || !map) return;
 
-    const paths = parcel.geometry.coordinates.map((poly) =>
-      poly[0].map((coord) => [coord[1], coord[0]] as [number, number])
-    );
+    // MCP returns geometry as WKT string; Leaflet needs LatLng[][]
+    let geojson: GeoJSON.Polygon | GeoJSON.MultiPolygon;
+    if (typeof parcel.geometry === 'string') {
+      // Parse WKT
+      const wkt = parcel.geometry;
+      const coords = wkt
+        .replace('MULTIPOLYGON(((', '')
+        .replace(')))', '')
+        .split(',')
+        .map(pair => pair.trim().split(' ').map(Number) as [number, number]);
+      geojson = {
+        type: 'MultiPolygon',
+        coordinates: [[coords.map(c => [c[0], c[1]] as [number, number])]]
+      };
+    } else {
+      geojson = parcel.geometry as unknown as GeoJSON.MultiPolygon;
+    }
 
-    const polygons = paths.map((path) =>
-      L.polygon(path, {
+    const layer = L.geoJSON(geojson, {
+      style: {
         color: '#e94560',
         weight: 3,
         opacity: 0.8,
         fillColor: '#e94560',
         fillOpacity: 0.2,
-      }).addTo(map)
-    );
+      },
+    }).addTo(map);
 
-    return () => {
-      polygons.forEach((p) => map.removeLayer(p));
-    };
+    return () => { map.removeLayer(layer); };
   }, [map, parcel]);
 
   return null;
