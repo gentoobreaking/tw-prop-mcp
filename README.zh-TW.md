@@ -1,4 +1,4 @@
-# 臺灣實價登錄 MCP 伺服器
+ # 臺灣實價登錄 MCP 伺服器
 
 > 基於內政部實價登錄資料的 MCP Server，具備確定性、可重現性與 AI 隔離特性。
 
@@ -46,7 +46,7 @@ tw-prop-mcp 透過 [Model Context Protocol (MCP)](https://spec.modelcontextproto
                        │ 使用             使用
                        ▼                 ▼
               ┌─────────────────┐ ┌─────────────────┐
-              │  PostgreSQL     │ │  PostGIS 3.5    │
+              │  PostgreSQL     │ │  PostGIS 3.6    │
               │ 16 + PostGIS    │ │ (EPSG:3826→4326)│
               │ migrations/     │ │                 │
               └─────────────────┘ └─────────────────┘
@@ -63,7 +63,7 @@ tw-prop-mcp 透過 [Model Context Protocol (MCP)](https://spec.modelcontextproto
 | 領域模型 | `internal/domain/` | 核心類別：Transaction、Parcel、Valuation、Provenance、RoadAccess |
 | 資料匯入 | `internal/downloader/`, `internal/importpipeline/` | MOI 資料下載、解析、正規化、驗證、匯入管線 |
 | GIS | `internal/gis/` | 座標系轉換 (EPSG:3826 ↔ 4326)、幾何適配 |
-| 前端 | `frontend/` | React + TypeScript + Google Maps (獨立 Dockerfile) |
+│ 前端 | `frontend/` | React + TypeScript + Leaflet/Google Maps (獨立 Dockerfile) |
 
 ## 功能列表
 
@@ -207,7 +207,7 @@ tw-prop-mcp/
 ├── Dockerfile                        # 多階段建置 (golang:1.26-alpine → alpine)
 ├── Dockerfile.frontend               # 前端建置 (node:20-alpine → nginx)
 ├── Makefile                          # Build、test、lint、migrate 目標
-├── frontend/                         # React + TypeScript + Google Maps
+├── frontend/                         # React + TypeScript + Leaflet/Google Maps
 ├── tests/                            # 測試套件
 │   ├── contract/                     # MCP contract tests
 │   ├── e2e/                          # 端對端接受測試
@@ -230,14 +230,14 @@ tw-prop-mcp/
 ### Runtime
 
 - **Go**: 1.26+
-- **PostgreSQL**: 16+ (需安裝 PostGIS 3.5 擴充套件)
+ - **PostgreSQL**: 16+ (需安裝 PostGIS 3.6 擴充套件)
 - **作業系統**: 任意 (Docker 建議用于 PostgreSQL)
 
 ### 外部服務
 
 - **內政部實價登錄**: `https://plvr.land.moi.gov.tw/` — 資料來源
 - **OpenTelemetry Collector** (選用): 透過 `OTEL_EXPORTER_OTLP_ENDPOINT` 收集追蹤/指標
-- **Google Maps API** (前端專用): 前端地圖渲染所需
+ - **Google Maps API** (前端專用): 前端地圖渲染所需 (Leaflet + OSM 為預設，不需 API 金鑰)
 
 ## 安裝
 
@@ -311,8 +311,16 @@ docker compose ps
 | `--snapshot-id` | `DEFAULT_SNAPSHOT_VERSION` | `latest` | 預設資料快照 |
 | `--algorithm` | `ALGORITHM_VERSION` | `comparable-v2.0` | 演算法版本 |
 | `--data-url` | `DATA_IMPORT_URL` | — | 直接下載 URL |
-| `--auto` | — | `false` | 自動從 MOI 落地頁抓取最新下載 URL |
 
+### 前端設定 (Runtime)
+
+| 變數 | 預設值 | 說明 |
+|------|--------|------|
+| `MCP_SERVER_URL` | `/mcp` | MCP 伺服器 URL (透過 runtime-config.js 注入) |
+| `MAP_PROVIDER` | `leaflet` | 地圖提供者：`leaflet` 或 `google` |
+| `GOOGLE_MAPS_API_KEY` | (無) | Google Maps JS API 金鑰 (建置時注入)，僅 `MAP_PROVIDER=google` 時需設定 |
+
+前端 `runtime-config.js` 在容器啟動時由 nginx entrypoint hook 動態生成，更改設定無需重新建置前端映像。
 ## 快速開始
 
 ### 1. 啟動 PostgreSQL + PostGIS
@@ -323,7 +331,7 @@ docker run -d --name postgres \
   -e POSTGRES_USER=prop \
   -e POSTGRES_PASSWORD=prop_dev_only \
   -p 5432:5432 \
-  postgis/postgis:16-3.5
+  postgis/postgis:16-3.6
 
 # 執行 migrations
 go run ./cmd/migrate up
@@ -562,14 +570,23 @@ docker run -p 8080:8080 \
   tw-prop-mcp
 ```
 
-### 前端 (React + Google Maps)
+### 前端 (React + Leaflet/Google Maps)
 
 ```bash
-# 建置與提供服務
-docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend . \
-  --build-arg VITE_GOOGLE_MAPS_API_KEY=your_key_here
-docker run -p 80:80 tw-prop-mcp-frontend
+# 建置與提供服務 (runtime-config.js 在容器啟動時生成)
+docker compose up -d --build tw-prop-frontend
+#
+# 執行單獨容器 (需要在 .env 中設定 GOOGLE_MAPS_API_KEY 若使用 Google Maps 提供者)
+docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend .
+# Build args: VITE_GOOGLE_MAPS_API_KEY (Google Maps JS API key, optional)
+# Runtime env: MAP_PROVIDER=leaflet|google (default: leaflet), MCP_SERVER_URL=/mcp
+docker run -p 80:80 \
+  -e MAP_PROVIDER=leaflet \
+  -e MCP_SERVER_URL=/mcp \
+  tw-prop-mcp-frontend
 ```
+
+前端 `runtime-config.js` 在容器啟動時由 nginx entrypoint 挙辨生成，不需重新建置。
 
 ### 健康檢查
 
@@ -608,8 +625,9 @@ docker run -p 80:80 tw-prop-mcp-frontend
 - **`/readyz` 健康檢查**: 不驗證資料庫連線 — 僅回傳靜態 OK [NEEDS VERIFICATION]
 - **`DATABASE_URL` 必要**: 無資料庫連線不啟動
 - **前端整合未驗證**: React 前端通過 `tsc --noEmit` 類型檢查，但 CI 不執行瀏覽器整合測試
+  - **前端搜尋 UI 未實現**: 前端目前僅顯示預設地號 (`useMCP.ts` 硬編碼)，無地號搜尋輸入框
+  - **Google Maps API 金鑰**: 切換到 Google Maps 提供者需設定有效金鑰；Leaflet + OSM 為預設
 - **PostGIS 依賴**: 所有 GIS 操作需要 PostGIS 擴充套件。未安裝時 `check_road_access` 等工具可能失敗
-- **無請求限流**: MCP server 不實作請求速率限制。AI Agent 發出大量並發請求可能壓垪資料庫
 
 ## 授權
 

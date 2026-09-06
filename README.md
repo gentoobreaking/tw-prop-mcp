@@ -1,645 +1,311 @@
-# Taiwan Real-Estate Actual Transaction MCP
+# Taiwan Real-Estate MCP Server
 
-> Taiwan Ministry of the Interior real price registration data served as an MCP server. Deterministic, reproducible, and AI-isolated.
+> Taiwan Ministry of the Interior real price registration data (實價登錄) served through the [Model Context Protocol (MCP)](https://spec.modelcontextprotocol.io/). Deterministic, reproducible, and AI-isolated.
 
 ## Overview
 
-tw-prop-mcp exposes Taiwan's official real-estate transaction data (MOI 實價登錄) through the [Model Context Protocol (MCP)](https://spec.modelcontextprotocol.io/). AI agents query **17 typed tools** covering transactions, parcels, GIS geometry, comparable analysis, valuation, and provenance — all backed by PostgreSQL + PostGIS with deterministic query hashing and AI isolation enforcement.
+`tw-prop-mcp` exposes Taiwan's official real-estate transaction data through a typed MCP server. Clients (Claude, Cursor, custom agents) query 17 tools covering transactions, parcels, GIS geometry, comparable analysis, valuation, and provenance — all backed by PostgreSQL + PostGIS with deterministic query hashing and AI isolation enforcement.
 
-The server ensures:
+Design principles ([SPEC.md](SPEC.md)):
 
-- **Deterministic**: Same snapshot + query params + algorithm + config → same result (query hash verified)
-- **AI Isolation**: Tool parameters are structured. SQL, PostGIS expressions, and valuation formulas are rejected
-- **Artifact Locking**: Once locked, snapshots, algorithms, and configs cannot be modified (DB-level constraints)
-- **Provenance**: Every result traces Transaction → Snapshot → Official Source
+- **P1 Deterministic**: Same snapshot + params + algorithm + config → same output (query hash verified)
+- **P2 Immutable Raw Data**: Official source data is read-only archive; snapshots become lockable
+- **P4 AI Isolation**: Tool parameters are structured — SQL, PostGIS expressions, and valuation formulas are rejected
+- **P5 Artifact Locking**: DB-level constraints prevent mutation of locked snapshots, algorithms, configs
+- **P6 Provenance**: Every result traces Transaction → Snapshot → Official Source
 
 ## Architecture
 
 ```
-                    ┌──────────────────────────────────┐
-                    │            MCP Client             │
-                    │  (Claude, Cursor, custom agent)   │
-                    └──────────┬───────────────────────┘
-                               │ MCP over stdio or HTTP
-                               ▼
-                    ┌──────────────────────────────────┐
-                    │     cmd/realestate-mcp            │
-                    │  CLI flags + env var resolution   │
-                    └──────────┬───────────────────────┘
-                               │ initializes
-                               ▼
-                    ┌──────────────────────────────────┐
-                    │    internal/mcp/*_tools.go       │
-                    │  ┌────────┬────────────┐         │
-                    │  │17 tools│5 resources │         │
-                    │  │        │3 prompts   │         │
-                    │  └────┬───┴─────┬──────┘         │
-                    └──────┼─────────┼────────────────┘
-                           │   calls   │
-                           ▼           ▼
-              ┌─────────────────┐ ┌─────────────────┐
-              │  Service Layer  │ │  Repository     │
-              │ valuation/      │ │ repository/     │
-              │ statistics/     │ │ (sqlc gen)      │
-              │ service/        │ │                 │
-              └────────┬────────┘ └────────┬────────┘
-                       │ uses           uses
-                       ▼                 ▼
-              ┌─────────────────┐ ┌─────────────────┐
-              │  PostgreSQL     │ │  PostGIS 3.5    │
-              │ 16 + PostGIS    │ │ (EPSG:3826→4326)│
-              │ migrations/     │ │                 │
-              └─────────────────┘ └─────────────────┘
+                 ┌─────────────────────┐
+                 │    MCP Client       │  (Claude, Cursor, custom agent)
+                 └─────────┬───────────┘
+                           │  MCP-over-HTTP (SSE) or stdio
+                           ▼
+                 ┌─────────────────────┐
+                 │  cmd/realestate-mcp │  CLI flags, env, OTel init
+                 └─────────┬───────────┘
+                           │ initializes
+                           ▼
+                 ┌─────────────────────┐
+                 │  internal/mcp/      │  17 tools · 5 resources · 3 prompts
+                 │  *_tools.go         │  AI isolation · provenance injection
+                 └────┬──────────┬─────┘
+                      │         │
+                 uses  │         │ uses
+                      ▼         ▼
+         ┌─────────────────┐ ┌──────────────────┐
+         │  Service Layer  │ │  Repository      │
+         │  valuation/     │ │  (sqlc gen)      │
+         │  statistics/    │ │  pgx/v5          │
+         └────────┬────────┘ └────────┬────────┘
+                  │ uses            uses
+                  ▼                 ▼
+         ┌─────────────────┐ ┌──────────────────┐
+         │  PostgreSQL 16  │ │  PostGIS 3.6     │
+         │  + PostGIS      │ │  EPSG:3826↔4326  │
+         └─────────────────┘ └──────────────────┘
 ```
 
 ### Components
 
 | Layer | Package | Responsibility |
-| ------- | --------- | ---------------- |
+|-------|---------|----------------|
 | Entry point | `cmd/realestate-mcp/main.go` | CLI flags, env resolution, OTel init, server bootstrap |
 | MCP Interface | `internal/mcp/` | 17 tools, 5 resources, 3 prompts, AI isolation, observability, error model |
 | Service | `internal/service/`, `internal/valuation/`, `internal/statistics/` | Business logic: comparable scoring, statistics, road access |
 | Repository | `internal/repository/` | pgx/v5 + sqlc generated queries |
-| Domain | `internal/domain/` | Core types: Transaction, Parcel, Valuation, Provenance, RoadAccess |
-| Ingestion | `internal/downloader/`, `internal/importpipeline/` | MOI data download, parse, normalize, validate, import pipeline |
-| GIS | `internal/gis/` | Coordinate transform (EPSG:3826 ↔ 4326), geometry adapter |
-| Frontend | `frontend/` | React + TypeScript + Google Maps (separate Dockerfile) |
+| Domain | `internal/domain/` | Core types: Transaction, Parcel, Valuation, Provenance |
+| GIS | `internal/gis/` | Coordinate transform (EPSG:3826 ↔ 4326) |
+| Ingestion | `internal/downloader/`, `internal/importpipeline/` | MOI data download → parse → normalize → validate → import |
+| Frontend | `frontend/` | React + TypeScript — Leaflet (default) or Google Maps, MCP client |
 
-## Features
+## Quick Start
 
-### 17 MCP Tools
+```bash
+# 1. Create .env (secrets never committed)
+cp env.example .env
+# Edit .env — optionally set GOOGLE_MAPS_API_KEY for Google Maps provider
 
-**Transaction Tools** (`internal/mcp/transaction_tools.go`)
+# 2. Build and start all services
+docker compose up -d --build
 
-| Tool | Description |
-| ------ | ------------- |
-| `search_transactions` | Filter by county/district/section, price range, date range |
-| `get_transaction` | Get single transaction by UUID |
-| `get_transaction_statistics` | Min/P25/median/mean/P75/P90/max for a geographic area |
+# 3. Verify
+curl http://localhost/healthz     # {"status":"ok"}
+open http://localhost/            # Frontend map UI
 
-**Parcel Tools** (`internal/mcp/parcel_tools.go`)
+# 4. Check PostGIS extension
+docker exec tw-prop-postgres psql -U prop -d prop -c "SELECT extname,extversion FROM pg_extension WHERE extname='postgis';"
+```
 
+## MCP Tools
+
+### Transaction Tools
 | Tool | Description |
 |------|-------------|
-| `get_parcel` | Get parcel by UUID |
-| `search_parcels` | Search parcels by section + land number |
+| `search_transactions` | Filter by county/district/section, price range, date range, land/area type |
+| `get_transaction` | Single transaction by UUID |
+| `get_transaction_statistics` | Min/P25/median/mean/P75/P90/max for a geographic area |
 
-**Comparable Tools** (`internal/mcp/comparable_tools.go`)
+### Parcel Tools
+| Tool | Description |
+|------|-------------|
+| `get_parcel` | Parcel by county/district/section/land_number |
+| `search_parcels` | Search by section + land number |
 
+### Comparable Tools
 | Tool | Description |
 |------|-------------|
 | `find_comparable_transactions` | Find and score comparable transactions |
 | `score_comparable_transactions` | Score specific transactions as comparables |
 
-**GIS Tools** (`internal/mcp/gis_tools.go`)
-
+### GIS Tools
 | Tool | Description |
-| ------ | ------------- |
-| `get_parcel_geometry` | WKT geometry (EPSG:4326) |
-| `get_parcel_location` | Centroid, bbox, coordinates |
-| `check_road_access` | Road adjacency classification (4 types) |
+|------|-------------|
+| `get_parcel_geometry` | WKT geometry in EPSG:4326 |
+| `get_parcel_location` | Centroid lat/lng, bbox, map context |
+| `check_road_access` | Road adjacency classification (ROAD_ADJACENT/ROAD_NEARBY/NO_ROAD_DETECTED/UNKNOWN) |
 | `find_nearby_roads` | Roads within search radius |
 | `get_parcel_map_context` | Combined parcel + roads + comparables for map display |
 
-**Valuation Tools** (`internal/mcp/valuation_tools.go`)
-
+### Valuation Tools
 | Tool | Description |
-| ------ | ------------- |
+|------|-------------|
 | `estimate_land_value` | Bear/base/bull estimation with confidence |
 | `estimate_property_value` | Land + building valuation |
 | `explain_valuation` | Human-readable valuation explanation |
 
-**Provenance Tools** (`internal/mcp/provenance_tools.go`)
-
+### Provenance Tools
 | Tool | Description |
 |------|-------------|
-| `get_data_snapshot` | Snapshot metadata (source, version, record count, status) |
+| `get_data_snapshot` | Snapshot metadata (source, version, record count) |
 | `get_data_provenance` | Full provenance chain for any result |
 
-### 5 MCP Resources (`internal/mcp/resources.go`)
+See [MCP_API.md](MCP_API.md) for full input/output schemas.
 
+## MCP Resources
 - `realestate://snapshot/{snapshot_id}` — dataset snapshot metadata
 - `realestate://transaction/{transaction_id}` — transaction provenance
 - `realestate://parcel/{parcel_id}` — parcel geometry + ownership
 - `realestate://valuation/{valuation_id}` — full valuation result
 - `realestate://algorithm/{version}` — algorithm config + weights
 
-### 3 MCP Prompts (`internal/mcp/prompts.go`)
-
-| Prompt | Purpose |
-| -------- | --------- |
-| `prompt_explain_valuation` | Explain valuation methodology after `estimate_land_value` |
-| `prompt_analyze_comparables` | Structured comparable transaction analysis |
-| `prompt_debug_transaction` | Diagnose unexpected query results |
-
-### Data Pipeline (`internal/importpipeline/pipeline.go`)
-
-1. Download — fetch CSV from MOI (`--auto` discovers latest URL)
-2. Verify checksum — SHA256 validation of source file
-3. Parse — CSV → intermediate rows (`internal/parser/`)
-4. Enrich — derive county/district from filename
-5. Normalize — clean + standardize fields (`internal/normalizer/`)
-6. Validate — quality checks (`internal/validator/`)
-7. Deduplicate — remove duplicate records
-8. Import — `BEGIN` / `COMMIT` / `ROLLBACK` transactional batch insert
-9. Lock — snapshot transition to LOCKED (immutable)
-
-### Key Principles
-
-- **Deterministic**: Query hash = `canonicalize(snapshot_id, query_params, algorithm_version, config_version)`
-- **AI Isolation**: `ProhibitedFields` validates all tool inputs — rejects `sql`, `where`, `postgis`, `valuation_formula`, `weights` (P4)
-- **Artifact Lock**: Migrations 002-004 create DB-level triggers enforcing immutability of snapshots, configs, and raw data (P5)
-- **Provenance**: All results include `source`, `snapshot_id`, `source_record_hash`, `import_batch_id` (P6)
-
-## Project Structure
-
-```
-tw-prop-mcp/
-├── cmd/realestate-mcp/main.go       # Entry point: CLI flags, env, OTel, server
-├── internal/
-│   ├── clock/                        # Clock abstraction for testing
-│   ├── comparable/                   # Comparable engine core
-│   │   └── engine.go                 # Filtering + scoring (hardcoded weights)
-│   ├── config/                       # Server config + DB connection
-│   ├── domain/                       # Core domain models
-│   │   ├── transaction.go
-│   │   ├── parcel.go
-│   │   ├── valuation.go
-│   │   ├── comparable.go
-│   │   ├── statistics.go
-│   │   ├── parcel_road_access.go
-│   │   ├── road_segment.go
-│   │   ├── provenance.go
-│   │   └── snapshot.go
-│   ├── downloader/                   # MOI data download + archiving
-│   │   ├── downloader.go             # HTTP downloader with retry
-│   │   ├── discover.go               # Auto-discover latest URL from landing page
-│   │   ├── checksum.go               # SHA256 checksum verification
-│   │   ├── archive.go                # Archive management
-│   │   └── snapshot.go               # Idempotent snapshot logic
-│   ├── gis/                          # GIS adapters and transforms
-│   │   ├── transform.go              # EPSG:3826 ↔ 4326
-│   │   ├── adapter.go                # PostGIS geometry adapter
-│   │   └── importer.go               # Geometry import utilities
-│   ├── importpipeline/               # Full import pipeline
-│   │   └── pipeline.go               # 9-stage pipeline (download→lock)
-│   ├── mcp/                          # MCP server, tools, resources, prompts
-│   │   ├── server.go                 # Server bootstrap, HTTP/stdio transport
-│   │   ├── transaction_tools.go
-│   │   ├── parcel_tools.go
-│   │   ├── comparable_tools.go
-│   │   ├── gis_tools.go
-│   │   ├── valuation_tools.go
-│   │   ├── provenance_tools.go
-│   │   ├── resources.go              # 5 realestate:// resources
-│   │   ├── prompts.go                # 3 prompt templates
-│   │   ├── errors.go                 # ProhibitedFields, McpError
-│   │   ├── instrument.go             # Provenance injection, query hash
-│   │   └── observability.go          # Metrics, tracing, request logging
-│   ├── normalizer/                   # CSV normalization
-│   │   ├── normalizer.go
-│   │   ├── transaction.go
-│   │   └── parcel.go
-│   ├── parser/                       # CSV parsing
-│   │   ├── parser.go
-│   │   ├── fieldmap.go
-│   │   └── encoding.go
-│   ├── provenance/                   # Hash generation + service
-│   │   ├── hash.go
-│   │   └── service.go
-│   ├── repository/                   # Data access (sqlc generated)
-│   │   ├── db/                       # SQLC output + Queries
-│   │   ├── transaction.go
-│   │   ├── parcel.go
-│   │   ├── snapshot.go
-│   │   ├── road_segment.go
-│   │   ├── parcel_road_access.go
-│   │   └── valuation_result.go
-│   ├── service/                      # Business logic
-│   │   ├── transaction.go
-│   │   ├── road_access.go
-│   └── statistics/                  # Statistics engine
-│       └── engine.go                # Percentile calculations
-├── migrations/                        # golang-migrate SQL migrations
-├── sqlc.yaml                         # SQLC configuration
-├── Dockerfile                        # Multi-stage (golang:1.26-alpine → alpine)
-├── Dockerfile.frontend               # Frontend build (node:20-alpine → nginx)
-├── Makefile                          # Build, test, lint, migrate targets
-├── frontend/                         # React + TypeScript + Google Maps
-├── tests/                            # Test suites
-│   ├── contract/                     # MCP contract tests
-│   ├── e2e/                          # End-to-end acceptance tests
-│   ├── integration/                  # Integration tests (PostgreSQL)
-│   ├── isolation/                    # AI injection prevention tests
-│   ├── reproducibility/              # Determinism + query hash tests
-│   └── golden/                       # Golden dataset for regression
-├── scripts/verify.sh                 # 16-step automated verification
-├── SPEC.md                           # System spec (P1-P6 principles)
-├── DATA_MODEL.md                     # Database schema + domain models
-├── MCP_API.md                        # MCP tools, resources, error model
-├── GIS_SPEC.md                       # Coordinate system + road access
-├── VALUATION_SPEC.md                 # Comparable + statistics + valuation
-├── IMPLEMENTATION_PLAN.md            # 18-stage implementation plan
-└── go.mod
-```
-
-## Requirements
-
-### Runtime
-
-- **Go**: 1.26+
-- **PostgreSQL**: 16+ with PostGIS 3.5+ extension
-- **Environment**: Any (Docker recommended for PostgreSQL)
-
-### External Dependencies
-
-- **MOI Real Price Registration**: `https://plvr.land.moi.gov.tw/` — data source
-- **OpenTelemetry Collector** (optional): for span/metrics collection via `OTEL_EXPORTER_OTLP_ENDPOINT`
-- **Google Maps API** (frontend only): required for map rendering in `frontend/`
-
-## Installation
-
-### From Source
-
-```bash
-# 1. Clone
-git clone <repo-url>
-cd tw-prop-mcp
-
-# 2. Ensure Go 1.26+
-go version  # should show 1.26.x
-
-# 3. Build
-make build  # outputs to bin/realestate-mcp
-# Or: go build -o bin/realestate-mcp ./cmd/realestate-mcp
-```
-
-### Docker
-
-```bash
-# Main server (Go + Alpine, non-root)
-docker build -t tw-prop-mcp .
-
-# Frontend (React + nginx)
-docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend frontend/
-```
-
-### Run with Docker Compose
-
-```bash
-# 1. Create .env from template
-cp env.example .env
-# Edit .env — set GOOGLE_MAPS_API_KEY to your real key
-
-# 2. Start all services (postgres → mcp-server → frontend)
-docker compose up -d --build
-
-# 3. Check status
-docker compose ps
-```
-
-| Service | URL | Description |
-| --------- | ----- | ------------- |
-| PostgreSQL | `localhost:5432` | PostgreSQL 16 + PostGIS |
-| MCP Server | `localhost:8080` | Streamable HTTP on `/mcp`, metrics on `/metrics` |
-| Frontend | `localhost:80` | React + nginx (proxies `/mcp` → MCP Server) |
+## MCP Prompts
+- `prompt_explain_valuation` — Explain methodology after `estimate_land_value`
+- `prompt_analyze_comparables` — Structured comparable analysis
+- `prompt_debug_transaction` — Diagnose unexpected query results
 
 ## Configuration
 
-### Server Environment Variables
+### Environment Variables
 
-| Variable | Default | Description |
-| ---------- | --------- | ------------- |
-| `MCP_TRANSPORT` | `http` | Transport: `stdio` or `http` |
-| `MCP_HTTP_ADDR` | `:8080` | HTTP listen address (HTTP mode only) |
-| `DATABASE_URL` | — | PostgreSQL connection string (`postgresql://user:pass@host:5432/db`) |
-| `DEFAULT_SNAPSHOT_VERSION` | `latest` | Default snapshot ID for queries |
-| `ALGORITHM_VERSION` | `comparable-v2.0` | Algorithm version for query hashing |
-| `CONFIGURATION_VERSION` | `v2.0` | Configuration version for query hashing |
-| `DATA_IMPORT_URL` | — | Direct download URL for data import |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OpenTelemetry OTLRP HTTP endpoint (e.g. `http://localhost:4318`) |
-| `LOG_LEVEL` | `info` | Log level (info, debug, warn, error) |
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DATABASE_URL` | (required) | PostgreSQL DSN |
+| `MCP_TRANSPORT` | `http` | `http` or `stdio` |
+| `MCP_HTTP_ADDR` | `:8080` | HTTP listen address |
+| `LOG_LEVEL` | `info` | `debug\|info\|warn\|error` |
+| `DEFAULT_SNAPSHOT_VERSION` | `latest` | Default snapshot for queries |
+| `ALGORITHM_VERSION` | `comparable-v2.0` | Default algorithm version |
+| `CONFIGURATION_VERSION` | `v2.0` | Default valuation config version |
+| `GOOGLE_MAPS_API_KEY` | (build-time) | Google Maps JS API key (optional — Leaflet is default) |
+| `MAP_PROVIDER` | `leaflet` | `leaflet` or `google` (runtime, frontend only) |
+| `MCP_SERVER_URL` | `/mcp` | MCP server URL for frontend (runtime, injected via nginx) |
 
-### CLI Flags
-
-| Flag | Env Var | Default | Description |
-| ----- | --------- | --------- | ------------- |
-| `--transport` | `MCP_TRANSPORT` | `http` | `stdio` or `http` |
-| `--addr` | `MCP_HTTP_ADDR` | `:8080` | HTTP listen address |
-| `--snapshot-id` | `DEFAULT_SNAPSHOT_VERSION` | `latest` | Default dataset snapshot |
-| `--algorithm` | `ALGORITHM_VERSION` | `comparable-v2.0` | Algorithm version |
-| `--data-url` | `DATA_IMPORT_URL` | — | Direct download URL |
-| `--auto` | — | `false` | Auto-discover latest data URL from MOI landing page |
-
-### Data Import
+### Docker Compose
 
 ```bash
-# Auto-discover latest MOI data URL and import
-./bin/realestate-mcp --auto --data-url "" --snapshot-id 2025Q1
-
-# Or specify a direct URL
-./bin/realestate-mcp --data-url https://plvr.land.moi.gov.tw/Download/GetFile?type=csv&id=XXXX
+docker compose up -d --build
 ```
 
-## Quick Start
+Services:
 
-### 1. Start PostgreSQL with PostGIS
+| Service | Port | Description |
+|---------|------|-------------|
+| `tw-prop-postgres` | 5432 | PostgreSQL 16 + PostGIS 3.6 (arm64 Alpine) |
+| `tw-prop-mcp` | 8080 | Go MCP server (HTTP transport) |
+| `tw-prop-frontend` | 80 | React + nginx frontend |
 
+Frontend `runtime-config.js` is generated at container start by nginx entrypoint hook — config changes do not require rebuild.
+
+### Frontend Runtime Config
+
+`runtime-config.js` is injected at container start:
+```json
+{
+  "MCP_SERVER_URL": "/mcp",
+  "MAP_PROVIDER": "leaflet"
+}
+```
+
+Switching to Google Maps:
 ```bash
-docker run -d --name postgres \
-  -e POSTGRES_DB=prop \
-  -e POSTGRES_USER=prop \
-  -e POSTGRES_PASSWORD=prop_dev_only \
-  -p 5432:5432 \
-  postgis/postgis:16-3.5
-
-# Run migrations
-go run ./cmd/migrate up  # or: migrate -path migrations -database "postgresql://prop:prop_dev_only@localhost:5432/prop?sslmode=disable" up
+# Edit .env
+MAP_PROVIDER=google
+GOOGLE_MAPS_API_KEY=your_real_api_key_here
+# Restart
+docker compose up -d --build tw-prop-frontend
 ```
 
-### 2. Import Data
+## Data Pipeline
 
-```bash
-# Auto-discover latest URL from MOI landing page and import
-export DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop
-./bin/realestate-mcp --auto --snapshot-id 2025Q1
+The import pipeline ([SPEC.md](SPEC.md) §P2):
+
+1. **Download** — fetch CSV from MOI `plvr.land.moi.gov.tw`
+2. **Verify checksum** — SHA256 validation
+3. **Parse** — CSV → intermediate rows
+4. **Enrich** — derive county/district from filename
+5. **Normalize** — clean + standardize fields
+6. **Validate** — quality checks
+7. **Deduplicate** — remove duplicate records
+8. **Import** — transactional batch insert (`BEGIN`/`COMMIT`)
+9. **Lock** — snapshot transition to LOCKED (immutable)
+
+```
+make migrate       # Run database migrations
+make seed          # Load sample data (for development)
+make verify        # Run 16-step automated verification suite
 ```
 
-### 3. Start the MCP Server
+## Coordinate Systems
 
-```bash
-# HTTP mode (for remote clients)
-export MCP_TRANSPORT=http
-export MCP_HTTP_ADDR=:8080
-export DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop
-./bin/realestate-mcp
+- **Stored**: EPSG:3826 (Taiwan Zone 2, TWD97) — PostGIS native
+- **API Output**: EPSG:4326 (WGS84) — via `ST_Transform(geometry, 4326)`
+- Transform layer in `internal/gis/transform.go`
 
-# Stdio mode (for Claude Desktop)
-export MCP_TRANSPORT=stdio
-export DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop
-./bin/realestate-mcp
+## Error Model
+
+MCP tool errors follow structured format:
+```json
+{
+  "error": {
+    "code": "PARCEL_NOT_FOUND",
+    "message": "...",
+    "retryable": false
+  }
+}
 ```
 
-### 4. Query Transactions
-
-```bash
-curl -X POST http://localhost:8080/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/call",
-    "params": {
-      "name": "search_transactions",
-      "arguments": {
-        "county": "澎湖縣",
-        "district": "西嶼鄉",
-        "limit": 10
-      }
-    }
-  }'
-```
-
-## MCP API
-
-### Tool Schema
-
-All tools use typed input/output via `mcpapi.AddTool` generics. Each response includes `metadata` with:
-
-- `query_hash` — deterministic hash of (snapshot + params + algorithm + config)
-- `snapshot_id` — dataset version the result comes from
-- `algorithm_version` — algorithm used
-- `configuration_version` — config version used
-
-### Error Model (`internal/mcp/errors.go`)
-
-| Code | Meaning |
-| ------ | --------- |
-| `INVALID_ARGUMENT` | Parameter validation failed |
-| `PARCEL_NOT_FOUND` | Parcel UUID not in database |
-| `TRANSACTION_NOT_FOUND` | Transaction UUID not found |
-| `DATA_NOT_AVAILABLE` | No data for the query parameters |
-| `GIS_NOT_AVAILABLE` | PostGIS geometry operation failed |
-| `SNAPSHOT_NOT_FOUND` | Snapshot ID not found |
-| `VALUATION_NOT_AVAILABLE` | Insufficient comparables for valuation |
-| `SOURCE_UNAVAILABLE` | Official data source unreachable |
-| `INTERNAL_ERROR` | Server-side exception |
-
-### AI Isolation (P4)
-
-All tool handlers validate raw arguments against `ProhibitedFields` before any business logic:
-
-```go
-blockedFields := []string{"sql", "where", "postgis", "valuation_formula", "weights", "expression", "raw_sql"}
-```
-
-Rejected input returns `INVALID_ARGUMENT` error. This prevents LLM prompt injection from escalating to SQL or custom query execution.
-
-## Data Model
-
-Core entities (see `internal/domain/`):
-
-- **Transaction**: `total_price`, `unit_price` as `int64` (no float for currency), `section`/`land_number` as parcel identity key
-- **Parcel**: geometry in EPSG:3826 (PostGIS), output converted to EPSG:4326
-- **ValuationResult**: Bear (P25), Base (P50), Bull (P75) values + Confidence level (HIGH/MEDIUM/LOW/INSUFFICIENT)
-- **ComparableCandidate**: scored transaction with `area_similarity`, `distance_meters`, `time_weight`, `zoning_match`, `land_use_match`, `road_access_match`
-
-### Parcel Identity (4-key)
-
-A parcel is uniquely identified by: `county + district + section + land_number`
-
-### Statistics
-
-`statistics/engine.go` computes:
-
-- Percentiles: P0/P10/P25/median(mean)/P75/P90/P100
-- Outliers: IQR method with configurable k-factor
-- Area conversion: 1 坪 = 3.305785 m²
-
-## Valuation Engine
-
-The valuation engine (`internal/valuation/engine.go`) implements:
-
-1. **Comparable filtering**: Same county → district → section → building type
-2. **Distance scoring**: Linear distance to road + parcel centroid proximity
-3. **Time weight**: Exponential decay `exp(-lambda * days_since_sale)`
-4. **Area similarity**: `min(area_a, area_b) / max(area_a, area_b)`
-5. **Outlier removal**: IQR method (k=1.5) on comparable unit prices
-6. **Bear/Base/Bull**: P25, P50 (weighted median), P75 of outlier-adjusted comparables
-7. **Confidence**: HIGH (≥5 comparables), MEDIUM (≥2), LOW (<2) or INSUFFICIENT
-
-## Error Handling
-
-- All MCP tool errors return structured `McpError` with code + retryable flag
-- Database errors wrapped with stage context via `ImportPipelineError`
-- Network errors (HTTP 5xx, timeouts) are marked retryable in the import pipeline
-
-## Logging and Observability
-
-### Prometheus Metrics (`internal/mcp/observability.go`)
-
-- `mcp_requests_total` — per-tool request counter
-- `mcp_request_duration_seconds` — histogram per tool
-- `transaction_query_total` — transaction query counter
-- `gis_query_total` — GIS query counter
-- `comparable_query_total` — comparable query counter
-- `valuation_query_total` — valuation query counter
-- `data_import_total` — import success/fail counter
-- `snapshot_locked_total` — snapshot lock counter
-
-### OpenTelemetry
-
-- OTLP HTTP exporter via `OTEL_EXPORTER_OTLP_ENDPOINT` (default: `http://localhost:4318`)
-- `BatchSpanProcessor` for buffered export
-- Service name: `tw-prop-mcp`
-- Falls back to no-op tracer when endpoint not configured
-
-### Structured Logging
-
-- Request-level logging with `request_id`, `tool_name`, `snapshot_id`, `query_hash`
-- Import pipeline logs each stage with structured fields
-
-### HTTP Endpoints (HTTP transport only)
-
-- `/mcp` — MCP Streamable HTTP endpoint
-- `/healthz` — Liveness probe
-- `/readyz` — Readiness probe
-- `/metrics` — Prometheus metrics
+Error codes: `INVALID_ARGUMENT`, `PARCEL_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `DATA_NOT_AVAILABLE`, `GIS_NOT_AVAILABLE`, `SNAPSHOT_NOT_FOUND`, `VALUATION_NOT_AVAILABLE`, `SOURCE_UNAVAILABLE`, `INTERNAL_ERROR`.
 
 ## Testing
 
 ```bash
-# Unit tests (no PostgreSQL required)
-go test ./internal/... -count=1
-
-# Exclude config tests (require PostgreSQL container)
+# All tests
 make test
 
-# Integration tests (require PostgreSQL + PostGIS)
-make test-integration
-go test -tags=integration ./tests/integration/... -count=1
-
-# E2E acceptance tests
-go test -tags=e2e ./tests/e2e/... -count=1
-
-# Contract tests
-go test ./tests/contract/... -count=1
-
-# Isolation tests (AI injection prevention)
-go test ./tests/isolation/... -count=1
-
-# Reproducibility tests (determinism verification)
-go test ./tests/reproducibility/... -count=1
-
-# Artifact lock tests
-go test -tags=integration ./tests/artifact_lock/... -count=1
-
-# Benchmarks (real MOI data)
-go test -bench=. -benchmem ./internal/importpipeline/...
-
-# Full verification suite
-bash scripts/verify.sh  # 20 steps, runs all above
+# Test categories
+go test ./tests/isolation/...    # AI injection prevention (P4)
+go test ./tests/reproducibility/ # Determinism + query hash
+go test ./tests/contract/...     # MCP contract tests
+go test ./tests/integration/...  # PostgreSQL integration
+go test ./tests/e2e/...          # End-to-end acceptance
 ```
 
-### Test Counts
-
-- Unit tests: 244 pass (2 config tests fail without PostgreSQL container)
-- Integration: 10 pass
-- E2E: 7 pass
-- Contract: 12 pass
-- Isolation: 11 pass
-- Reproducibility: 16 pass
-- Artifact lock: 10 pass
-- Benchmarks: 7 pass
+Test coverage is enforced at 80% minimum. See `scripts/verify.sh` for full 16-step verification.
 
 ## Build
 
 ```bash
-make build          # go build -o bin/realestate-mcp ./cmd/realestate-mcp
-make vet            # go vet ./...
-make lint           # golangci-lint run ./... || go vet ./...
-make sqlc           # Regenerate sqlc code
-make tidy           # go mod tidy
+make build    # Go binary: bin/realestate-mcp
+make docker   # Build Docker images
+```
+
+Frontend:
+```bash
+cd frontend
+npm ci
+npm run dev    # http://localhost:5173
+npm run build  # Production build to dist/
 ```
 
 ## Deployment
 
-### Docker Compose (recommended)
-
+### Docker Compose (Development)
 ```bash
-# One-command dev stack: postgres + MCP server + frontend
-cp env.example .env
-# Edit .env — set GOOGLE_MAPS_API_KEY to your real key
 docker compose up -d --build
 ```
 
-Services are started in dependency order (postgres → mcp-server → frontend)
-with health-check gating.  See the service URL table above.
+### Kubernetes/OpenShift (Production)
+Reference architecture documented in [SPEC.md](SPEC.md) — requires PostgreSQL 16+ with PostGIS 3.5+, persistent volumes, and OpenTelemetry collector.
 
-### Docker (standalone)
+## Troubleshooting
 
-```bash
-# Build multi-stage image (golang:1.26-alpine → alpine:latest, non-root)
-docker build -t tw-prop-mcp .
+**Parcels not rendering on map**:
+- Ensure sample data loaded: `docker compose exec tw-prop-postgres psql -U prop -d prop -c "SELECT COUNT(*) FROM parcel;"`
+- Check PostGIS: `docker exec tw-prop-postgres psql -U prop -d prop -c "SELECT extname FROM pg_extension;"`
+- Verify MCP connectivity: `curl http://localhost/healthz`
 
-# Run
-docker run -p 8080:8080 \
-  -e DATABASE_URL=postgresql://prop:prop_dev_only@localhost:5432/prop \
-  -e MCP_TRANSPORT=http \
-  tw-prop-mcp
-```
+**MCP connection errors**:
+- Frontend connects via `/mcp` (nginx proxy — same origin)
+- Direct server: `http://localhost:8080/mcp`
+- Use `MCP_TRANSPORT=stdio` for local development without HTTP
 
-### Frontend (React + Google Maps)
-
-```bash
-# Build and serve
-docker build -f Dockerfile.frontend -t tw-prop-mcp-frontend . \
-  --build-arg VITE_GOOGLE_MAPS_API_KEY=your_key_here
-docker run -p 80:80 tw-prop-mcp-frontend
-```
-
-### Health Checks
-
-- `GET /healthz` — liveness (always 200)
-- `GET /readyz` — readiness (returns `{"status":"ready"}`)
-- `GET /metrics` — Prometheus metrics
-
-> **Note**: `/readyz` returns a static OK without DB connectivity check. This is a known limitation — [NEEDS VERIFICATION] for production readiness.
-
-## Development
-
-### Adding a New MCP Tool
-
-1. Define input/output structs with typed fields
-2. Implement handler function matching `mcpapi.ToolHandler` signature
-3. Register via `mcpapi.AddTool(srv, &mcpapi.Tool{...}, handler)` in the appropriate `*_tools.go` file
-4. Add provenance injection via `instrument.go`
-5. Add to `tests/contract/contract_test.go`
-
-### Code Style
-
-- `gofmt` / `goimports` formatting
-- `golangci-lint` for static analysis
-- Test coverage target: ≥ 80%
-
-### Git Conventions
-
-- Conventional Commits (`feat:`, `fix:`, `docs:`, etc.)
-- One task per commit
-- `main` branch protected
+**WKT geometry not rendering**:
+- LeafletParcelLayer parses WKT MULTIPOLYGON from MCP `/mcp` endpoint
+- Verify geometry coordinates are EPSG:4326 (WGS84 lat/lng)
 
 ## Limitations
 
-- **No historical data import**: `--auto` fetches only the latest MOI snapshot. Historical data backfill requires manual URL enumeration
-- **Single snapshot**: Current import pipeline overwrites the latest snapshot. Multi-snapshot retention needs additional import batch IDs
-- **`/readyz` health check**: Does not verify database connectivity — returns static OK
-- **`DATABASE_URL` required**: Server cannot start without a database connection
-- **Frontend integration unverified**: React frontend builds correctly (`tsc --noEmit` passes) but browser-level integration with MCP server is not tested in CI
-- **PostGIS dependency**: All GIS operations require PostGIS extension. Without it, `check_road_access` and geometry tools may fail
-- **No rate limiting**: MCP server does not implement request rate limiting. AI agents making many concurrent calls may overwhelm the database
+- Sample data must be loaded separately (`make seed` or SQL import) — production requires full MOI dataset import via pipeline
+- Google Maps provider requires valid API key; Leaflet + OSM is default
+- K8s/OpenShift deployment manifests not included in repo — documented in SPEC.md only
+- Frontend parcel search UI not yet implemented (hardcoded sample parcel in `useMCP.ts`)
+
+## Development
+
+```bash
+# Prerequisites: Go 1.26+, PostgreSQL 16+, Docker
+git clone <repo-url>
+cd tw-prop-mcp
+make deps      # Install Go tooling
+make migrate   # Database migrations
+make seed      # Sample data
+make test      # All tests
+```
 
 ## License
 
-Licensed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) for details.
+This project is licensed under the Apache License 2.0 — see [LICENSE](LICENSE).
 
-> This project is for research and reference purposes only. Data sourced from the Ministry of the Interior's real price registration provides. Use of this data must comply with the relevant laws and regulations of Taiwan.
+Data sourced from Taiwan Ministry of the Interior Real Price Registration (實價登錄). Use of this data must comply with relevant laws and regulations of Taiwan.
