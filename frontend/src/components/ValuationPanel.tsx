@@ -80,10 +80,9 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
         <div className="insufficient-data">
           <p>Insufficient Data</p>
           <p>
-            Required: {valuation.comparable_count ?? 0}
             {comparables.length > 0
-              ? ` | Available: ${comparables.length}`
-              : ''}
+              ? `Available: ${comparables.length} comparable${comparables.length === 1 ? '' : 's'}`
+              : 'No comparables available'}
           </p>
           <p className="insufficient-reason">
             Not enough comparable transactions to compute a reliable valuation.
@@ -140,7 +139,7 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
 
       {/* Valuation inputs — SPEC §27 */}
       <div className="valuation-meta">
-        <div>Comparable Count: {valuation.comparable_count ?? comparables.length}</div>
+        <div>Comparables: {comparables.length}</div>
         <div>Algorithm: {valuation.algorithm_version ?? '—'}</div>
         <div>Config: {valuation.configuration_version ?? '—'}</div>
         <div>Outlier Method: {valuation.outlier_method ?? '—'}</div>
@@ -176,11 +175,11 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
       )}
 
       {/* Explanation link */}
-      {onExplain && valuation.valuation_id && (
+      {onExplain && valuation.id && (
         <div className="valuation-actions">
           <button
             className="valuation-explain-btn"
-            onClick={() => onExplain(valuation.valuation_id)}
+            onClick={() => onExplain(valuation.id)}
           >
             查看估價說明
           </button>

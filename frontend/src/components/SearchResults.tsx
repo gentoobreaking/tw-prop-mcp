@@ -11,7 +11,7 @@ import type { ParcelSummary } from '../types';
 import './SearchResults.css';
 
 export interface SearchResultItem {
-  parcel_id: string;
+  id: string;
   county: string;
   district: string;
   section: string;
@@ -68,7 +68,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       <div className="search-results-list">
         {results.map((parcel, index) => (
           <button
-            key={parcel.parcel_id || `${parcel.county}-${parcel.district}-${parcel.section}-${parcel.land_number}-${index}`}
+            key={parcel.id || `${parcel.county}-${parcel.district}-${parcel.section}-${parcel.land_number}-${index}`}
             className="search-result-item"
             onClick={() => onSelect(parcel)}
           >

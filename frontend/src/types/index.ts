@@ -60,7 +60,7 @@ export interface GeoJSONFeature<T = Record<string, unknown>> {
  *  land_use_category, geometry, centroid, source, source_version
  */
 export interface Parcel {
-  parcel_id: string;
+  id: string;
   county: string;
   district: string;
   section: string;
@@ -79,7 +79,6 @@ export interface Parcel {
  *  When epsg=4326, geometry is in EPSG:4326; otherwise EPSG:3826.
  */
 export interface ParcelGeometry {
-  parcel_id: string;
   geometry: GeoMultiPolygon;
   centroid: LatLng;
   bbox: LatLngBounds;
@@ -156,48 +155,48 @@ export interface NearbyRoad {
 }
 
 /** Comparable transaction result from find_comparable_transactions.
+ *  Matches domain.ComparableResult from the MCP backend — flat struct, no nested Transaction.
  *  Backend ranking is authoritative — frontend must not reorder.
  */
 export interface ComparableResult {
-  transaction: Transaction;
-  score: number;
-  area_similarity: number;
+  id: string;
+  target_transaction_id: string;
+  candidate_transaction_id: string;
   distance_m: number;
-  time_score: number;
-  distance_score: number;
+  area_similarity: number;
   zoning_match: boolean;
   land_use_match: boolean;
   road_access_match: boolean;
-  /** Rank: 1-based, from backend ranking */
-  rank?: number;
+  time_score: number;
+  distance_score: number;
+  area_similarity_score: number;
+  zoning_match_score: number;
+  land_use_match_score: number;
+  road_access_match_score: number;
+  total_score: number;
+  algorithm_version: string;
+  created_at?: string;
 }
 
 /** Valuation result from estimate_land_value.
  *  Per spec §26: Bear/Base/Bull (per ping, 元/坪), Confidence, Comparable Count.
  */
 export interface ValuationResult {
-  valuation_id: string;
+  id: string;
   target_parcel_id: string;
   snapshot_id: string;
   bear_value: number;
   base_value: number;
   bull_value: number;
   confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
-  comparable_count: number;
+  comparable_ids: string[];
   algorithm_version: string;
   configuration_version: string;
   outlier_method: string;
-  statistics: Record<string, unknown>;
-  comparable_ids: string[];
+  raw_statistics?: Record<string, unknown>;
   /** Status: "COMPLETED" or "INSUFFICIENT_DATA" */
   status: 'COMPLETED' | 'INSUFFICIENT_DATA';
   query_hash: string;
-  /** Explanation string from explain_valuation */
-  explanation?: string;
-  /** Methodology description */
-  methodology?: string;
-  /** Valuation weights info */
-  weights?: Record<string, unknown>;
 }
 
 /** Map context from get_parcel_map_context */
@@ -213,23 +212,43 @@ export interface MapContext {
     west: number;
   };
 }
-
-/** Data provenance chain: Transaction → Snapshot → Official Source */
+/** Data provenance info for a single record in the chain */
 export interface ProvenanceInfo {
   source: string;
-  source_version: string;
-  snapshot_id: string;
-  downloaded_at?: string;
-  file_sha256?: string;
-  record_count?: number;
-  record_id?: string;
+  dataset_snapshot: string;
+  source_file: string;
+  record_hash: string;
+  import_batch_id: string;
+  algorithm_version: string;
 }
 
-/** Provenance chain for a specific data category */
+/** Provenance chain from get_data_provenance.
+ *  Maps to domain.ProvenanceChain — full traceability from valuation back to official source.
+ */
 export interface ProvenanceChain {
-  target: 'parcel' | 'transaction' | 'gis' | 'road' | 'comparable' | 'valuation';
-  chain: ProvenanceInfo[];
-  query_hash?: string;
+  valuation_id: string;
+  valuation_status: string;
+  bear_value: number;
+  base_value: number;
+  bull_value: number;
+  target_parcel: string;
+  target_parcel_location: string;
+  target_transaction_id?: string;
+  algorithm_version: string;
+  configuration_version: string;
+  outlier_method: string;
+  confidence: string;
+  comparable_ids: string[];
+  comparable_provenance?: ProvenanceInfo[];
+  source: string;
+  dataset_snapshot: string;
+  source_file: string;
+  snapshot_sha256?: string;
+  snapshot_status: string;
+  statistics?: Record<string, unknown>;
+  weights?: Record<string, unknown>;
+  status: string;
+  error?: string;
 }
 
 /** MCP response metadata envelope (from spec §3.6) */
@@ -267,7 +286,7 @@ export interface SearchParcelResult {
 
 /** Compact parcel summary for search results */
 export interface ParcelSummary {
-  parcel_id: string;
+  id: string;
   county: string;
   district: string;
   section: string;

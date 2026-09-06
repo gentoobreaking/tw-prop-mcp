@@ -126,7 +126,7 @@ const App: React.FC = () => {
 
   // Handle search result selection — SPEC §9.1
   const handleSelectResult = (parcel: {
-    parcel_id: string;
+    id: string;
     county: string;
     district: string;
     section: string;
@@ -308,10 +308,6 @@ const App: React.FC = () => {
                   error={comparablesError ?? null}
                   selectedComparable={selectedComparable}
                   onSelect={selectComparable}
-                  onComparableTransactionClick={(tx) => {
-                    selectTransaction(tx);
-                    setActivePanel('transactions');
-                  }}
                 />
               </div>
             )}

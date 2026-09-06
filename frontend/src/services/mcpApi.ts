@@ -121,12 +121,13 @@ export async function getParcel(params: {
   section: string;
   landNumber: string;
 }): Promise<Parcel> {
-  return callMCPTool<Parcel>('get_parcel', {
+  const raw = await callMCPTool<{ parcel: Parcel }>('get_parcel', {
     county: params.county,
     district: params.district,
     section: params.section,
     land_number: params.landNumber,
   });
+  return raw.parcel;
 }
 
 export async function searchParcels(params: {
@@ -281,7 +282,6 @@ export async function findComparables(params: {
 }
 
 // --- Valuation Tools ---
-
 export async function estimateLandValue(
   parcelId: string,
   opts?: {
@@ -291,13 +291,14 @@ export async function estimateLandValue(
     outlierMethod?: string;
   },
 ): Promise<ValuationResult> {
-  return callMCPTool<ValuationResult>('estimate_land_value', {
+  const raw = await callMCPTool<{ result: ValuationResult }>('estimate_land_value', {
     parcel_id: parcelId,
     ...(opts?.snapshotId && { snapshot_id: opts.snapshotId }),
     ...(opts?.algorithmVersion && { algorithm_version: opts.algorithmVersion }),
     ...(opts?.configurationVersion && { configuration_version: opts.configurationVersion }),
     ...(opts?.outlierMethod && { outlier_method: opts.outlierMethod }),
   });
+  return raw.result;
 }
 
 export async function explainValuation(
@@ -313,9 +314,10 @@ export async function explainValuation(
 // --- Provenance Tools ---
 
 export async function getDataProvenance(parcelId?: string): Promise<ProvenanceChain> {
-  return callMCPTool<ProvenanceChain>('get_data_provenance', {
+  const raw = await callMCPTool<{ provenance_chain: ProvenanceChain }>('get_data_provenance', {
     ...(parcelId && { parcel_id: parcelId }),
   });
+  return raw.provenance_chain;
 }
 
 export async function getDataSnapshot(snapshotId: string): Promise<Record<string, unknown>> {
@@ -351,7 +353,7 @@ export async function loadParcelView(params: LoadParcelViewParams): Promise<{
 }> {
   // First, fetch the parcel to obtain its UUID
   const parcel = await getParcel(params);
-  const parcelId = parcel.parcel_id;
+  const parcelId = parcel.id;
 
   // Fetch all data in parallel
   const [

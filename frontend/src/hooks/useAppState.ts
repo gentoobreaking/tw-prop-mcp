@@ -397,7 +397,7 @@ export function useAppState() {
             county,
             district,
             ...(section && { section }),
-            ...(landNumber && { landNumber }),
+            // landNumber is not supported by search_parcels — only by get_parcel
             limit: 100,
           }),
         );
@@ -520,7 +520,7 @@ export function useAppState() {
         }));
 
         // Now load dependent data: transactions, roads, comparables, valuation
-        await loadDependentDataRef.current(geometry.parcel_id, identity);
+        await loadDependentDataRef.current(parcelInfo.id, identity);
       } catch (err) {
         const { message, mcpError } = formatError(err);
         setState((s) => ({
@@ -618,10 +618,10 @@ export function useAppState() {
       }));
 
       // Load valuation explanation after valuation is set
-      if (valuationResp.status === 'fulfilled' && valuationResp.value.valuation_id) {
+      if (valuationResp.status === 'fulfilled' && valuationResp.value.id) {
         try {
           const explanation = await withRetry(() =>
-            mcpApi.explainValuation(valuationResp.value.valuation_id, 'detailed'),
+            mcpApi.explainValuation(valuationResp.value.id, 'detailed'),
           );
           setState((s) => ({
             ...s,

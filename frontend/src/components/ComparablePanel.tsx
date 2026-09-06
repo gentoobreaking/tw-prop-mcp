@@ -1,15 +1,15 @@
 /**
  * ComparablePanel — comparable transaction analysis with ranking.
  *
- * Per SPEC §22-23: shows candidate transactions, similarity score,
- * distance, area similarity, time/zoning/land-use/road scores.
+ * Per SPEC §22-23: shows comparable transactions with similarity scores,
+ * distance, area similarity, time/zoning/land-use/road match scores.
  * Per SPEC §23: frontend must NOT independently reorder — backend ranking
  * is authoritative.
  * Per SPEC §74: frontend does not compute scores.
  */
 
 import React from 'react';
-import type { ComparableResult, Transaction } from '../types';
+import type { ComparableResult } from '../types';
 import './ComparablePanel.css';
 
 interface ComparablePanelProps {
@@ -18,7 +18,6 @@ interface ComparablePanelProps {
   error: string | null;
   selectedComparable: ComparableResult | null;
   onSelect: (comp: ComparableResult) => void;
-  onComparableTransactionClick: (tx: Transaction) => void;
 }
 
 export const ComparablePanel: React.FC<ComparablePanelProps> = ({
@@ -27,7 +26,6 @@ export const ComparablePanel: React.FC<ComparablePanelProps> = ({
   error,
   selectedComparable,
   onSelect,
-  onComparableTransactionClick,
 }) => {
   if (loading) {
     return (
@@ -67,14 +65,11 @@ export const ComparablePanel: React.FC<ComparablePanelProps> = ({
       <div className="comparable-list">
         {comparables.map((comp, index) => (
           <ComparableItem
-            key={comp.transaction?.transaction_id || index}
+            key={comp.candidate_transaction_id || index}
             rank={index + 1}
             comparable={comp}
-            isSelected={selectedComparable?.transaction?.transaction_id === comp.transaction?.transaction_id}
+            isSelected={selectedComparable?.candidate_transaction_id === comp.candidate_transaction_id}
             onSelect={() => onSelect(comp)}
-            onTransactionClick={() =>
-              comp.transaction && onComparableTransactionClick(comp.transaction)
-            }
           />
         ))}
       </div>
@@ -91,7 +86,6 @@ interface ComparableItemProps {
   comparable: ComparableResult;
   isSelected: boolean;
   onSelect: () => void;
-  onTransactionClick: () => void;
 }
 
 const ComparableItem: React.FC<ComparableItemProps> = ({
@@ -99,10 +93,8 @@ const ComparableItem: React.FC<ComparableItemProps> = ({
   comparable,
   isSelected,
   onSelect,
-  onTransactionClick,
 }) => {
-  const tx = comparable.transaction;
-  const scorePercent = (comparable.score * 100).toFixed(1);
+  const scorePercent = (comparable.total_score * 100).toFixed(1);
 
   return (
     <div
@@ -114,29 +106,14 @@ const ComparableItem: React.FC<ComparableItemProps> = ({
 
       <div className="comparable-info">
         <div className="comparable-location">
-          {tx?.county} {tx?.district} {tx?.section} {tx?.land_number}
+          交易 {comparable.candidate_transaction_id.slice(0, 8)}
         </div>
-        <div className="comparable-date">{tx?.transaction_date}</div>
       </div>
 
       <div className="comparable-metrics">
         <Metric label="距離" value={`${comparable.distance_m.toFixed(0)} m`} />
         <Metric label="面積相似" value={`${(comparable.area_similarity * 100).toFixed(0)}%`} />
-        <Metric label="總價" value={`NT$ ${tx?.total_price?.toLocaleString() ?? '—'}`} />
       </div>
-
-      {tx && (
-        <button
-          className="comparable-tx-link"
-          onClick={(e) => {
-            e.stopPropagation();
-            onTransactionClick();
-          }}
-          aria-label={`View transaction ${tx.transaction_id.slice(0, 8)}`}
-        >
-          查看交易
-        </button>
-      )}
     </div>
   );
 };
@@ -153,9 +130,9 @@ const ComparableDetail: React.FC<{ comparable: ComparableResult }> = ({ comparab
   <div className="comparable-detail">
     <h4 className="comparable-detail-title">可比分析</h4>
     <div className="comparable-scores">
-      <ScoreBar label="總分" score={comparable.score} />
+      <ScoreBar label="總分" score={comparable.total_score} />
       <ScoreBar label="距離" score={comparable.distance_score} />
-      <ScoreBar label="面積" score={comparable.area_similarity} />
+      <ScoreBar label="面積" score={comparable.area_similarity_score} />
       <ScoreBar label="時間" score={comparable.time_score} />
     </div>
     <div className="comparable-matches">
@@ -172,21 +149,20 @@ const ScoreBar: React.FC<{ label: string; score: number }> = ({ label, score }) 
     <div className="score-bar">
       <span className="score-label">{label}</span>
       <div className="score-track">
-        <div
-          className="score-fill"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="score-fill" style={{ width: `${pct}%` }} />
       </div>
-      <span className="score-value">{pct.toFixed(0)}%</span>
+      <span className="score-value">{score.toFixed(3)}</span>
     </div>
   );
 };
 
 const MatchLabel: React.FC<{ name: string; matched: boolean }> = ({ name, matched }) => (
   <div className="match-label">
-    <span className="match-name">{name}</span>
-    <span className={`match-value ${matched ? 'match' : 'no-match'}`}>
-      {matched ? '✓' : '✗'}
+    <span
+      className={`match-badge ${matched ? 'matched' : 'unmatched'}`}
+      aria-label={matched ? `${name}: 匹配` : `${name}: 不匹配`}
+    >
+      {name}: {matched ? '✓' : '✗'}
     </span>
   </div>
 );
