@@ -312,16 +312,25 @@ docker compose ps
 | `--algorithm` | `ALGORITHM_VERSION` | `comparable-v2.0` | 演算法版本 |
 | `--data-url` | `DATA_IMPORT_URL` | — | 直接下載 URL |
 
+
 ### 前端設定 (Runtime)
 
 | 變數 | 預設值 | 說明 |
 |------|--------|------|
 | `MCP_SERVER_URL` | `/mcp` | MCP 伺服器 URL (透過 runtime-config.js 注入) |
 | `MAP_PROVIDER` | `leaflet` | 地圖提供者：`leaflet` 或 `google` |
-| `GOOGLE_MAPS_API_KEY` | (無) | Google Maps JS API 金鑰 (建置時注入)，僅 `MAP_PROVIDER=google` 時需設定 |
+| `GOOGLE_MAPS_API_KEY` | (無) | Google Maps JS API 金鑰，僅 `MAP_PROVIDER=google` 時需設定 |
 
-前端 `runtime-config.js` 在容器啟動時由 nginx entrypoint hook 動態生成，更改設定無需重新建置前端映像。
-## 快速開始
+前端 `runtime-config.js` 在容器啟動時由 nginx entrypoint hook 動態生成，更改設定無需重新建置前端映像：
+```bash
+# 切換到 Leaflet (預設，不需 API 金鑰)
+docker compose up -d tw-prop-frontend
+
+# 切換到 Google Maps
+echo 'MAP_PROVIDER=google' >> .env
+echo 'GOOGLE_MAPS_API_KEY=your_real_api_key_here' >> .env
+docker compose up -d --build tw-prop-frontend
+```
 
 ### 1. 啟動 PostgreSQL + PostGIS
 

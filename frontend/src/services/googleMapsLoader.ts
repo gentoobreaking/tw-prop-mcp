@@ -7,7 +7,10 @@
  * @see https://developers.google.com/maps/documentation/javascript/load-maps-js
  */
 
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const API_KEY =
+  (typeof window !== 'undefined' &&
+    (window as unknown as { RUNTIME_CONFIG?: { GOOGLE_MAPS_API_KEY?: string } }).RUNTIME_CONFIG?.GOOGLE_MAPS_API_KEY) ||
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const API_BASE = 'https://maps.googleapis.com/maps/api/js';
 const LIBRARIES: string[] = ['marker'];
 

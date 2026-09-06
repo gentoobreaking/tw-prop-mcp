@@ -1,41 +1,73 @@
-import React from 'react';
-import type { RoadSegment } from '../types';
+/**
+ * RoadLayer — renders nearby road segments as polylines on the Google Map.
+ *
+ * Road geometry originates from the MCP `find_nearby_roads` / `check_road_access`
+ * tools (GIS engine). The frontend renders but does not compute road widths.
+ */
 
-interface RoadLayerProps {
-  google: typeof google;
-  map: google.maps.Map;
-  roads: RoadSegment[];
+import { useEffect, useRef } from 'react';
+import type { LineStringGeometry, NearbyRoad, RoadSegment } from '../types';
+
+export interface RoadLayerProps {
+  map: google.maps.Map | null;
+  google: typeof google | null;
+  roads: (NearbyRoad | RoadSegment)[] | null;
+  visible: boolean;
 }
 
-/**
- * Renders road segments as polylines on the map.
- * Width proportional to road width_m.
- */
-export const RoadLayer: React.FC<RoadLayerProps> = ({ google, map, roads }) => {
-  React.useEffect(() => {
-    if (!roads.length || !google || !map) return;
+export function RoadLayer({ map, google, roads, visible }: RoadLayerProps) {
+  const polylinesRef = useRef<google.maps.Polyline[]>([]);
 
-    const polylines: google.maps.Polyline[] = [];
+  const clearPolylines = () => {
+    polylinesRef.current.forEach((p) => p.setMap(null));
+    polylinesRef.current = [];
+  };
 
-    roads.forEach((road) => {
-      if (road.geometry) {
-        road.geometry.coordinates.forEach((line) => {
-          const polyline = new google.maps.Polyline({
-            map,
-            path: line.map((coord) => new google.maps.LatLng(coord[1], coord[0])),
-            strokeColor: '#333',
-            strokeWeight: road.width_m ? Math.max(1, road.width_m / 2) : 2,
-            strokeOpacity: 0.7,
-          });
-          polylines.push(polyline);
-        });
-      }
-    });
+  useEffect(() => {
+    if (!map || !google || !visible || !roads) {
+      clearPolylines();
+      return;
+    }
 
-    return () => {
-      polylines.forEach((p) => p.setMap(null));
-    };
-  }, [google, map, roads]);
+    const newPolylines: google.maps.Polyline[] = [];
+
+    for (const road of roads) {
+      const lineString = extractLineString(road);
+      if (!lineString) continue;
+
+      const path = lineString.coordinates.map((coord) => ({
+        lat: coord[1],
+        lng: coord[0],
+      }));
+
+      const width = 'width_m' in road && road.width_m ? road.width_m : undefined;
+      const polyline = new google.maps.Polyline({
+        path,
+        strokeColor: '#616161',
+        strokeOpacity: 0.7,
+        strokeWeight: width ? Math.max(2, Math.min(width, 8)) : 3,
+        map,
+        clickable: false,
+        zIndex: 5,
+      });
+      newPolylines.push(polyline);
+    }
+
+    polylinesRef.current = newPolylines;
+
+    return () => clearPolylines();
+  }, [map, google, roads, visible]);
+
+  // Cleanup on unmount
+  useEffect(() => clearPolylines, []);
 
   return null;
-};
+}
+
+/** Extract a LineString geometry from either NearbyRoad or RoadSegment. */
+function extractLineString(road: NearbyRoad | RoadSegment): LineStringGeometry | null {
+  if ('geometry' in road && road.geometry) {
+    return road.geometry;
+  }
+  return null;
+}

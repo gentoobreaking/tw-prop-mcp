@@ -28,9 +28,11 @@ COPY --chmod=755 <<'EOF' /docker-entrypoint.d/15-runtime-config.sh
 #!/bin/sh
 MCP_URL="${MCP_SERVER_URL:-/mcp}"
 MAP_PROVIDER="${MAP_PROVIDER:-leaflet}"
+GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}"
 echo "window.RUNTIME_CONFIG = {
   \"MCP_SERVER_URL\": \"${MCP_URL}\",
-  \"MAP_PROVIDER\": \"${MAP_PROVIDER}\"
+  \"MAP_PROVIDER\": \"${MAP_PROVIDER}\",
+  \"GOOGLE_MAPS_API_KEY\": \"${GOOGLE_MAPS_API_KEY}\"
 };" > /usr/share/nginx/html/runtime-config.js
 EOF
 

@@ -148,42 +148,18 @@ See [MCP_API.md](MCP_API.md) for full input/output schemas.
 | `DEFAULT_SNAPSHOT_VERSION` | `latest` | Default snapshot for queries |
 | `ALGORITHM_VERSION` | `comparable-v2.0` | Default algorithm version |
 | `CONFIGURATION_VERSION` | `v2.0` | Default valuation config version |
-| `GOOGLE_MAPS_API_KEY` | (build-time) | Google Maps JS API key (optional — Leaflet is default) |
+| `GOOGLE_MAPS_API_KEY` | (runtime) | Google Maps JS API key (optional — Leaflet is default) |
 | `MAP_PROVIDER` | `leaflet` | `leaflet` or `google` (runtime, frontend only) |
 | `MCP_SERVER_URL` | `/mcp` | MCP server URL for frontend (runtime, injected via nginx) |
 
-### Docker Compose
-
+The `MAP_PROVIDER` and `GOOGLE_MAPS_API_KEY` are read at **runtime** via `runtime-config.js`, which the nginx entrypoint hook generates on container start. Switching providers does **not** require rebuilding the frontend image:
 ```bash
-docker compose up -d --build
-```
+# Switch to Leaflet (default — no API key needed)
+docker compose up -d tw-prop-frontend
 
-Services:
-
-| Service | Port | Description |
-|---------|------|-------------|
-| `tw-prop-postgres` | 5432 | PostgreSQL 16 + PostGIS 3.6 (arm64 Alpine) |
-| `tw-prop-mcp` | 8080 | Go MCP server (HTTP transport) |
-| `tw-prop-frontend` | 80 | React + nginx frontend |
-
-Frontend `runtime-config.js` is generated at container start by nginx entrypoint hook — config changes do not require rebuild.
-
-### Frontend Runtime Config
-
-`runtime-config.js` is injected at container start:
-```json
-{
-  "MCP_SERVER_URL": "/mcp",
-  "MAP_PROVIDER": "leaflet"
-}
-```
-
-Switching to Google Maps:
-```bash
-# Edit .env
-MAP_PROVIDER=google
-GOOGLE_MAPS_API_KEY=your_real_api_key_here
-# Restart
+# Switch to Google Maps
+echo 'MAP_PROVIDER=google' >> .env
+echo 'GOOGLE_MAPS_API_KEY=your_real_api_key_here' >> .env
 docker compose up -d --build tw-prop-frontend
 ```
 

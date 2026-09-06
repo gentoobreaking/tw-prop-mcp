@@ -75,7 +75,27 @@ curl http://localhost/healthz     # {"status":"ok"}
 open http://localhost/            # 前端地图界面
 
 # 4. 检查 PostGIS 扩展
-docker exec tw-prop-postgres psql -U prop -d prop -c "SELECT extname,extversion FROM pg_extension WHERE extname='postgis';"
+
+## 配置
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `DATABASE_URL` | (必填) | PostgreSQL DSN |
+| `MCP_TRANSPORT` | `http` | `http` 或 `stdio` |
+| `MCP_HTTP_ADDR` | `:8080` | HTTP 监听地址 |
+| `MAP_PROVIDER` | `leaflet` | 地图提供者: `leaflet` 或 `google` |
+| `GOOGLE_MAPS_API_KEY` | (运行时) | Google Maps JS API 密钥, 仅 `MAP_PROVIDER=google` 时需要 |
+| `MCP_SERVER_URL` | `/mcp` | 前端 MCP 服务器 URL (运行时注入) |
+
+前端 `runtime-config.js` 在容器启动时由 nginx entrypoint 动态生成，切换提供者无需重新构建镜像:
+```bash
+# 切换到 Leaflet (默认 - 无需 API 密钥)
+docker compose up -d tw-prop-frontend
+
+# 切换到 Google Maps
+echo 'MAP_PROVIDER=google' >> .env
+echo 'GOOGLE_MAPS_API_KEY=your_real_api_key_here' >> .env
+docker compose up -d --build tw-prop-frontend
 ```
 
 ## MCP Tools

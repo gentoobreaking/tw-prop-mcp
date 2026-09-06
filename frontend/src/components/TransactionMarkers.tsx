@@ -1,58 +1,108 @@
-import React from 'react';
+/**
+ * TransactionMarkers — renders Google Maps markers for real-estate
+ * transactions returned by the MCP `search_transactions` tool.
+ *
+ * Uses google.maps.marker.AdvancedMarkerElement (modern marker library).
+ * Clustering is delegated to the MapView layer via a MarkerClusterer when
+ * available; individual markers are placed here from MCP transaction data
+ * only. The frontend does not compute clustering or geometry.
+ *
+ * SPEC §4.8: Google Maps is visualization only.
+ */
+
+import { useEffect, useRef } from 'react';
+import { transactionToMarker } from '../services/mapService';
 import type { Transaction } from '../types';
 
-interface TransactionMarkersProps {
-  google: typeof google;
-  map: google.maps.Map;
+export interface TransactionMarkersProps {
+  map: google.maps.Map | null;
+  google: typeof google | null;
   transactions: Transaction[];
+  visible: boolean;
+  /** Optional clusterer to attach markers to (created by MapView). */
+  clusterer?: unknown;
+  onMarkerClick?: (transaction: Transaction) => void;
 }
 
-/**
- * Renders transaction locations as markers on the map.
- * Clustered for performance with many transactions.
- */
-export const TransactionMarkers: React.FC<TransactionMarkersProps> = ({
-  google,
+export function TransactionMarkers({
   map,
+  google,
   transactions,
-}) => {
-  React.useEffect(() => {
-    if (!transactions.length || !google || !map) return;
+  visible,
+  onMarkerClick,
+}: TransactionMarkersProps) {
+  const markersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
 
-    const markers = transactions
-      .filter((t) => t.location)
-      .map((t) => {
-        const marker = new google.maps.Marker({
-          map,
-          position: { lat: t.location!.lat, lng: t.location!.lng },
-          title: `${t.district} ${t.section || ''} ${t.land_number || ''}`,
-        });
+  const clearMarkers = () => {
+    markersRef.current.forEach((marker) => {
+      marker.map = null;
+    });
+    markersRef.current.clear();
+  };
 
-        const info = new google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px;">
-              <strong>${t.transaction_id}</strong><br/>
-              ${t.county} ${t.district} ${t.section || ''} ${t.land_number || ''}<br/>
-              價格: NT$ ${t.total_price.toLocaleString()}<br/>
-              面積: ${t.land_area_sqm || 0} ㎡
-            </div>
-          `,
-        });
+  useEffect(() => {
+    if (!map || !google || !visible) {
+      clearMarkers();
+      return;
+    }
 
-        marker.addListener('click', () => {
-          info.open(map, marker);
-        });
+    const valid = transactions.filter((t) => t.latitude != null && t.longitude != null);
 
-        return { marker, info };
+    for (const tx of valid) {
+      const position = transactionToMarker(tx);
+      if (!position) continue;
+
+      const el = document.createElement('div');
+      el.className = 'map-marker transaction-marker';
+      const dot = document.createElement('div');
+      dot.className = 'map-marker__dot';
+      dot.style.backgroundColor = '#ff5722';
+      el.appendChild(dot);
+
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        position: { lat: position.lat, lng: position.lng },
+        content: el,
+        map,
+        title: `${tx.county}${tx.district}${tx.section} ${tx.land_number}`,
       });
 
-    return () => {
-      markers.forEach(({ marker, info }) => {
-        marker.setMap(null);
-        info.close();
+      const info = new google.maps.InfoWindow({
+        content: buildTransactionInfo(tx),
       });
-    };
-  }, [google, map, transactions]);
+
+      marker.addListener('click', () => {
+        info.open(map, marker);
+        onMarkerClick?.(tx);
+      });
+
+      markersRef.current.set(tx.transaction_id, marker);
+    }
+
+    return () => clearMarkers();
+  }, [map, google, transactions, visible, onMarkerClick]);
+
+  useEffect(() => clearMarkers, []);
 
   return null;
-};
+}
+
+function buildTransactionInfo(tx: Transaction): string {
+  const price = new Intl.NumberFormat('zh-TW', {
+    style: 'currency',
+    currency: 'TWD',
+  }).format(tx.total_price);
+
+  const ppp = tx.price_per_ping
+    ? `${Math.round(tx.price_per_ping).toLocaleString('zh-TW')} 元/坪`
+    : '';
+
+  return `
+    <div class="info-window">
+      <strong>${tx.county}${tx.district}${tx.section} ${tx.land_number}</strong>
+      <div>成交日: ${tx.transaction_date}</div>
+      <div>總價: ${price}</div>
+      ${ppp ? `<div>單價: ${ppp}</div>` : ''}
+      ${tx.address ? `<div>地址: ${tx.address}</div>` : ''}
+    </div>
+  `;
+}
