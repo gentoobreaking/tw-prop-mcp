@@ -24,10 +24,13 @@ import { TransactionPanel } from './components/TransactionPanel';
 import { ComparablePanel } from './components/ComparablePanel';
 import { RoadPanel } from './components/RoadPanel';
 import { ValuationPanel } from './components/ValuationPanel';
+import { ProvenancePanel } from './components/ProvenancePanel';
 import { ErrorState } from './components/ErrorState';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAppState } from './hooks/useAppState';
 import { disconnectMCP } from './services/mcpApi';
+import { parcelCentroid } from './services/mapService';
+import type { Transaction, ComparableResult } from './types';
 import './App.css';
 
 const MAP_PROVIDER = (typeof window !== 'undefined' &&
@@ -85,6 +88,8 @@ const App: React.FC = () => {
 
     // Valuation
     valuation,
+    valuationLoading,
+    valuationError,
 
     // Map
     mapContext,
@@ -253,13 +258,13 @@ const App: React.FC = () => {
                   parcelError={parcelError ?? parcelErrorMcp?.error.message ?? null}
                   transactions={transactions}
                   selectedTransaction={selectedTransaction}
-                  onSelectTransaction={(tx) => {
+                  _onSelectTransaction={(tx: Transaction) => {
                     selectTransaction(tx);
                     setActivePanel('transactions');
                   }}
                   comparables={comparables}
                   selectedComparable={selectedComparable}
-                  onSelectComparable={(comp) => {
+                  _onSelectComparable={(comp: ComparableResult) => {
                     selectComparable(comp);
                     setActivePanel('comparables');
                   }}
@@ -320,7 +325,7 @@ const App: React.FC = () => {
                   nearbyRoads={nearbyRoads}
                   loading={roadsLoading}
                   error={null}
-                  parcelLocation={selectedParcel?.centroid ?? null}
+                  parcelLocation={selectedParcel ? parcelCentroid(selectedParcel) : null}
                   onOpenStreetView={() => updateLayers({ showStreetView: true })}
                 />
               </div>
@@ -333,12 +338,12 @@ const App: React.FC = () => {
                   valuation={valuation}
                   comparables={comparables}
                   metadata={
-                    provenance.parcel
+                    valuation
                       ? {
-                          algorithm_version: '',
-                          snapshot_id: provenance.parcel.snapshot_id ?? '',
+                          algorithm_version: valuation.algorithm_version,
+                          snapshot_id: valuation.snapshot_id ?? '',
                           generated_at: '',
-                          query_hash: provenance.parcel.query_hash ?? '',
+                          query_hash: valuation.query_hash ?? '',
                           request_id: '',
                         }
                       : undefined
@@ -357,10 +362,10 @@ const App: React.FC = () => {
                 <ProvenancePanel
                   provenance={provenance}
                   metadata={{
-                    algorithm_version: '',
-                    snapshot_id: provenance.parcel?.snapshot_id ?? '',
+                    algorithm_version: valuation?.algorithm_version ?? '',
+                    snapshot_id: valuation?.snapshot_id ?? '',
                     generated_at: '',
-                    query_hash: provenance.parcel?.query_hash ?? '',
+                    query_hash: valuation?.query_hash ?? '',
                     request_id: '',
                   }}
                   valuation={

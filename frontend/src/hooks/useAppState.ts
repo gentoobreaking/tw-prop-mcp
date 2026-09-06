@@ -132,7 +132,7 @@ interface AppState {
   mapContext: MapContext | null;
 
   // Provenance
-  provenance: Record<string, ProvenanceChain>;
+  provenance: Record<string, ProvenanceChain | undefined>;
 
   // Layers
   layers: LayerState;
@@ -266,7 +266,7 @@ export function useAppState() {
   const loadDependentDataRef = useRef<(
     parcelId: string,
     identity: ParcelIdentity,
-  ) => Promise<void>>(() => {});
+  ) => Promise<void>>(async () => {});
 
   // --- Connection status check ---
   useEffect(() => {
@@ -313,8 +313,11 @@ export function useAppState() {
           throw err;
         }
         // Exponential backoff
-        const { promise, resolve } = Promise.withResolvers<void>();
-        setTimeout(resolve, Math.min(1000 * 2 ** attempt, 10000));
+        let resolveBackoff!: () => void;
+        const promise = new Promise<void>((resolve) => {
+          resolveBackoff = resolve;
+        });
+        setTimeout(resolveBackoff, Math.min(1000 * 2 ** attempt, 10000));
         await promise;
       }
     }
@@ -599,25 +602,12 @@ export function useAppState() {
         provenance: {
           ...s.provenance,
           parcel: provenanceResp.status === 'fulfilled' ? provenanceResp.value : undefined,
-          transaction:
-            transactionsResp.status === 'fulfilled'
-              ? {
-                  target: 'transaction',
-                  chain: transactionsResp.value.data_provenance ?? [],
-                }
-              : undefined,
-          comparable:
-            comparablesResp.status === 'fulfilled'
-              ? {
-                  target: 'comparable',
-                  chain: [],
-                  query_hash: comparablesResp.value.query_hash ?? undefined,
-                }
-              : undefined,
+          // Transaction/comparable provenance info is supplementary (data_provenance arrays)
+          // Only the parcel-level ProvenanceChain from get_data_provenance is stored as a full chain
         },
       }));
 
-      // Load valuation explanation after valuation is set
+      // Set valuation explanation after valuation is resolved
       if (valuationResp.status === 'fulfilled' && valuationResp.value.id) {
         try {
           const explanation = await withRetry(() =>
@@ -773,10 +763,8 @@ export function useAppState() {
     setState((s) => ({
       ...s,
       selectedComparable: comp,
-      // Selecting a comparable should also show its source transaction
-      ...(comp
-        ? { selectedTransaction: comp.transaction }
-        : { selectedTransaction: null }),
+      // Comparables don't carry transaction objects — no auto-selection
+      selectedTransaction: null,
     }));
   }, []);
 

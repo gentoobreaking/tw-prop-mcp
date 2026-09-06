@@ -7,11 +7,11 @@
  */
 
 import React, { useState } from 'react';
-import type { ProvenanceChain, ResponseMetadata } from '../types';
+import type { ProvenanceChain, ProvenanceInfo, ResponseMetadata } from '../types';
 import './ProvenancePanel.css';
 
 interface ProvenancePanelProps {
-  provenance: Record<string, ProvenanceChain>;
+  provenance: Record<string, ProvenanceChain | undefined>;
   metadata?: ResponseMetadata;
   valuation?: {
     query_hash?: string;
@@ -94,7 +94,28 @@ export const ProvenancePanel: React.FC<ProvenancePanelProps> = ({
 
           {/* Provenance chains from MCP tools */}
           {provenance && Object.entries(provenance).map(([key, chain]) => {
-            if (!chain || !chain.chain || chain.chain.length === 0) return null;
+            if (!chain) return null;
+            const chainItems = chain.comparable_provenance ?? [];
+            if (chainItems.length === 0) {
+              return (
+                <div key={key} className="provenance-section">
+                  <h4 className="provenance-section-title">
+                    {key === 'parcel' ? '地號' :
+                     key === 'transaction' ? '交易' :
+                     key === 'comparable' ? '可比交易' :
+                     key === 'gis' ? 'GIS' :
+                     key === 'road' ? '道路' :
+                     key === 'valuation' ? '估價' : key}
+                  </h4>
+                  <div className="provenance-info">
+                    <ProvenanceRow label="算法版本" value={chain.algorithm_version} />
+                    <ProvenanceRow label="配置版本" value={chain.configuration_version} />
+                    <ProvenanceRow label="來源" value={chain.source} />
+                    <ProvenanceRow label="資料集快照" value={chain.dataset_snapshot} />
+                  </div>
+                </div>
+              );
+            }
             return (
               <div key={key} className="provenance-section">
                 <h4 className="provenance-section-title">
@@ -106,30 +127,16 @@ export const ProvenancePanel: React.FC<ProvenancePanelProps> = ({
                    key === 'valuation' ? '估價' : key}
                 </h4>
                 <div className="provenance-chain">
-                  {chain.chain.map((info, index) => (
+                  {chainItems.map((info: ProvenanceInfo, index) => (
                     <div key={index} className="provenance-chain-item">
                       <div className="chain-arrow">
                         {index > 0 && <span className="arrow">→</span>}
                       </div>
                       <div className="provenance-info">
-                        {info.source && (
-                          <ProvenanceRow label="Source" value={info.source} />
-                        )}
-                        {info.source_version && (
-                          <ProvenanceRow label="Version" value={info.source_version} />
-                        )}
-                        {info.snapshot_id && (
-                          <ProvenanceRow label="Snapshot" value={info.snapshot_id} />
-                        )}
-                        {info.downloaded_at && (
-                          <ProvenanceRow label="Downloaded" value={info.downloaded_at} />
-                        )}
-                        {info.file_sha256 && (
-                          <ProvenanceRow label="File SHA256" value={info.file_sha256} />
-                        )}
-                        {info.record_count !== undefined && (
-                          <ProvenanceRow label="Record Count" value={String(info.record_count)} />
-                        )}
+                        <ProvenanceRow label="Source" value={info.source} />
+                        <ProvenanceRow label="Dataset" value={info.dataset_snapshot} />
+                        <ProvenanceRow label="File" value={info.source_file} />
+                        <ProvenanceRow label="Version" value={info.algorithm_version} />
                       </div>
                     </div>
                   ))}

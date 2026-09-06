@@ -46,7 +46,7 @@ export function TransactionMarkers({
       return;
     }
 
-    const valid = transactions.filter((t) => t.latitude != null && t.longitude != null);
+    const valid = transactions.filter((t) => t.location != null);
 
     for (const tx of valid) {
       const position = transactionToMarker(tx);
@@ -102,7 +102,6 @@ function buildTransactionInfo(tx: Transaction): string {
       <div>成交日: ${tx.transaction_date}</div>
       <div>總價: ${price}</div>
       ${ppp ? `<div>單價: ${ppp}</div>` : ''}
-      ${tx.address ? `<div>地址: ${tx.address}</div>` : ''}
     </div>
   `;
 }

@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { parcelGeometryToLatLngPaths } from '../services/mapService';
+import { parcelGeometryToLatLngPaths, parcelGeometryToGoogleBounds } from '../services/mapService';
 import type { ParcelGeometry } from '../types';
 
 export interface ParcelLayerProps {
@@ -63,14 +63,18 @@ export function ParcelLayer({
 
     // Optionally fit the map viewport to the parcel bounds
     if (fitBounds) {
-      const gBounds = polygonRef.current.getBounds();
+      const gBounds = parcelGeometryToGoogleBounds(geometry);
       if (gBounds) {
-        map.fitBounds(gBounds, 48);
+        const googleBounds = new google.maps.LatLngBounds(
+          { lat: gBounds.southwest.lat, lng: gBounds.southwest.lng },
+          { lat: gBounds.northeast.lat, lng: gBounds.northeast.lng },
+        );
+        map.fitBounds(googleBounds, 48);
         onBoundsFit?.({
-          north: gBounds.getNorthEast().lat(),
-          south: gBounds.getSouthWest().lat(),
-          east: gBounds.getNorthEast().lng(),
-          west: gBounds.getSouthWest().lng(),
+          north: gBounds.northeast.lat,
+          south: gBounds.southwest.lat,
+          east: gBounds.northeast.lng,
+          west: gBounds.southwest.lng,
         });
       }
     }

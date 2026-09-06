@@ -160,13 +160,10 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
         <div className="comparable-list">
           <h4>Comparable Transactions</h4>
           {comparables.map((c, index) => (
-            <div key={c.transaction.transaction_id} className="comparable-item">
-              <div className="score">#{index + 1} | Score: {(c.score * 100).toFixed(1)}%</div>
+            <div key={c.id} className="comparable-item">
+              <div className="score">#{index + 1} | Score: {(c.total_score * 100).toFixed(1)}%</div>
               <div className="details">
-                <div>
-                  {c.transaction.county} {c.transaction.district}
-                </div>
-                <div className="price">NT$ {c.transaction.total_price.toLocaleString()}</div>
+                <div>候選交易 #{c.candidate_transaction_id}</div>
                 <div className="distance">{c.distance_m.toFixed(0)} m away</div>
               </div>
             </div>

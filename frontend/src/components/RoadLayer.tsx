@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import type { LineStringGeometry, NearbyRoad, RoadSegment } from '../types';
+import type { GeoMultiLineString, NearbyRoad, RoadSegment } from '../types';
 
 export interface RoadLayerProps {
   map: google.maps.Map | null;
@@ -35,22 +35,25 @@ export function RoadLayer({ map, google, roads, visible }: RoadLayerProps) {
       const lineString = extractLineString(road);
       if (!lineString) continue;
 
-      const path = lineString.coordinates.map((coord) => ({
-        lat: coord[1],
-        lng: coord[0],
-      }));
+      // GeoMultiLineString.coordinates: number[][][] — array of LineStrings
+      for (const line of lineString.coordinates) {
+        const path = line.map((coord: number[]) => ({
+          lat: coord[1],
+          lng: coord[0],
+        }));
 
-      const width = 'width_m' in road && road.width_m ? road.width_m : undefined;
-      const polyline = new google.maps.Polyline({
-        path,
-        strokeColor: '#616161',
-        strokeOpacity: 0.7,
-        strokeWeight: width ? Math.max(2, Math.min(width, 8)) : 3,
-        map,
-        clickable: false,
-        zIndex: 5,
-      });
-      newPolylines.push(polyline);
+        const width = 'width_m' in road && road.width_m ? road.width_m : undefined;
+        const polyline = new google.maps.Polyline({
+          path,
+          strokeColor: '#616161',
+          strokeOpacity: 0.7,
+          strokeWeight: width ? Math.max(2, Math.min(width, 8)) : 3,
+          map,
+          clickable: false,
+          zIndex: 5,
+        });
+        newPolylines.push(polyline);
+      }
     }
 
     polylinesRef.current = newPolylines;
@@ -65,7 +68,7 @@ export function RoadLayer({ map, google, roads, visible }: RoadLayerProps) {
 }
 
 /** Extract a LineString geometry from either NearbyRoad or RoadSegment. */
-function extractLineString(road: NearbyRoad | RoadSegment): LineStringGeometry | null {
+function extractLineString(road: NearbyRoad | RoadSegment): GeoMultiLineString | null {
   if ('geometry' in road && road.geometry) {
     return road.geometry;
   }

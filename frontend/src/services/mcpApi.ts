@@ -348,7 +348,7 @@ export async function loadParcelView(params: LoadParcelViewParams): Promise<{
   comparables: ComparableResult[];
   valuation: ValuationResult;
   map_context: MapContext;
-  provenance: Record<string, ProvenanceChain>;
+  provenance: Record<string, ProvenanceChain | undefined>;
   metadata: ResponseMetadata;
 }> {
   // First, fetch the parcel to obtain its UUID

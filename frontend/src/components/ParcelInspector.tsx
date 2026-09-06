@@ -19,6 +19,7 @@ import type {
   ValuationResult,
   ProvenanceChain,
 } from '../types';
+import { parcelCentroid } from '../services/mapService';
 import './ParcelInspector.css';
 
 interface ParcelInspectorProps {
@@ -168,21 +169,26 @@ export const ParcelInspector: React.FC<ParcelInspectorProps> = ({
             <div className="info-row">
               <span className="info-label">坐標中心點</span>
               <span className="info-value">
-                {parcel.centroid.lat.toFixed(6)}, {parcel.centroid.lng.toFixed(6)}
+                {(() => {
+                  const c = parcelCentroid(parcel);
+                  return c ? `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}` : '—';
+                })()}
               </span>
             </div>
             <div className="info-row">
               <span className="info-label">範圍</span>
               <span className="info-value">
-                N:{parcel.bbox.northeast.lat.toFixed(6)} E:{parcel.bbox.northeast.lng.toFixed(6)}
+                {parcel.bbox || '—'}
               </span>
             </div>
             {parcel.geometry && (
               <div className="info-row">
                 <span className="info-label">幾何類型</span>
                 <span className="info-value">
-                  {parcel.geometry.type as string}
-                </span>
+                  {parcel.geometry.match(/^MULTIPOLYGON/i) ? 'MultiPolygon' :
+                   parcel.geometry.match(/^POLYGON/i) ? 'Polygon' :
+                   parcel.geometry.match(/^POINT/i) ? 'Point' : 'Unknown'}
+              </span>
               </div>
             )}
             {areaMismatch && (
@@ -240,7 +246,7 @@ export const ParcelInspector: React.FC<ParcelInspectorProps> = ({
         {selectedComparable ? (
           <div className="comparable-summary">
             <div className="comparable-score">
-              相似度: {(selectedComparable.score * 100).toFixed(1)}%
+              相似度: {(selectedComparable.total_score * 100).toFixed(1)}%
             </div>
             <div className="comparable-distance">
               距離: {selectedComparable.distance_m.toFixed(0)} m
@@ -340,26 +346,31 @@ export const ParcelInspector: React.FC<ParcelInspectorProps> = ({
 
 /** Compact provenance summary — SPEC §39-40 */
 const ProvenanceSummary: React.FC<{ provenance?: ProvenanceChain }> = ({ provenance }) => {
-  if (!provenance || !provenance.chain || provenance.chain.length === 0) {
+  if (!provenance) {
     return <p className="inspector-empty">無溯源資料</p>;
   }
-  const first = provenance.chain[0];
   return (
     <div className="provenance-summary">
       <div className="provenance-row">
         <span className="info-label">來源</span>
-        <span className="info-value">{first.source || '—'}</span>
+        <span className="info-value">{provenance.source || '—'}</span>
       </div>
       <div className="provenance-row">
-        <span className="info-label">資料集</span>
-        <span className="info-value">{first.snapshot_id || '—'}</span>
+        <span className="info-label">資料集快照</span>
+        <span className="info-value">{provenance.dataset_snapshot || '—'}</span>
       </div>
-      {provenance.query_hash && (
+      <div className="provenance-row">
+        <span className="info-label">算法版本</span>
+        <span className="info-value">{provenance.algorithm_version || '—'}</span>
+      </div>
+      <div className="provenance-row">
+        <span className="info-label">狀態</span>
+        <span className="info-value">{provenance.status || '—'}</span>
+      </div>
+      {provenance.comparable_provenance && provenance.comparable_provenance.length > 0 && (
         <div className="provenance-row">
-          <span className="info-label">查詢哈希</span>
-          <span className="info-value">
-            <code>{provenance.query_hash.slice(0, 16)}…</code>
-          </span>
+          <span className="info-label">可比來源數</span>
+          <span className="info-value">{provenance.comparable_provenance.length}</span>
         </div>
       )}
     </div>

@@ -42,24 +42,17 @@ export function useMCP(): {
             ]
           : [],
         comparables: appState.comparables,
-        valuation: appState.valuation,
-        map_context: appState.mapContext,
-        metadata: appState.provenance.parcel
-          ? {
-              algorithm_version: '',
-              snapshot_id: appState.provenance.parcel.snapshot_id ?? '',
-              generatedAt: '',
-              query_hash: appState.provenance.parcel.query_hash ?? '',
-            }
-          : {
-              algorithm_version: '',
-              snapshot_id: '',
-              generatedAt: '',
-              query_hash: '',
-            },
+        valuation: appState.valuation ?? undefined,
+        map_context: appState.mapContext ?? undefined,
+        metadata: {
+          algorithm_version: appState.valuation?.algorithm_version ?? '',
+          snapshot_id: appState.valuation?.snapshot_id ?? '',
+          generated_at: '',
+          query_hash: appState.valuation?.query_hash ?? '',
+          request_id: '',
+        },
       }
     : null;
-
   return {
     data,
     loading: appState.parcelLoading || appState.searchLoading,

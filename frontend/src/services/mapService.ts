@@ -81,3 +81,32 @@ export function parcelGeometryToLatLngPaths(parcel: ParcelGeometry): LatLng[][] 
   return null;
 }
 
+/** Compute Google Maps LatLngBounds from a parcel's WKT geometry */
+export function parcelGeometryToGoogleBounds(parcel: ParcelGeometry): {
+  northeast: LatLng;
+  southwest: LatLng;
+} | null {
+  const paths = parcelGeometryToLatLngPaths(parcel);
+  if (!paths || paths.length === 0) return null;
+
+  const allPoints = paths.flat();
+  if (allPoints.length === 0) return null;
+
+  let minLat = Infinity,
+    maxLat = -Infinity;
+  let minLng = Infinity,
+    maxLng = -Infinity;
+
+  for (const p of allPoints) {
+    minLat = Math.min(minLat, p.lat);
+    maxLat = Math.max(maxLat, p.lat);
+    minLng = Math.min(minLng, p.lng);
+    maxLng = Math.max(maxLng, p.lng);
+  }
+
+  return {
+    northeast: { lat: maxLat, lng: maxLng },
+    southwest: { lat: minLat, lng: minLng },
+  };
+}
+

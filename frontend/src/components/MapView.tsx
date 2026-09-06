@@ -19,6 +19,8 @@ import type {
   RoadSegment,
   ComparableResult,
   MapContext,
+  ViewData,
+  ResponseMetadata,
 } from '../types';
 import { LeafletParcelLayer } from './LeafletParcelLayer';
 import { LeafletRoadLayer } from './LeafletRoadLayer';
@@ -128,10 +130,10 @@ const MapView: React.FC<MapViewProps> = ({
     if (MAP_PROVIDER !== 'google' || !isLoaded || !googleMapRef || !googleApi || !parcel) return null;
     return (
       <>
-        <ParcelLayer google={googleApi} map={googleMapRef} geometry={parcel ?? null} />
-        {showRoads && <RoadLayer google={googleApi} map={googleMapRef} roads={roads} />}
+        <ParcelLayer google={googleApi} map={googleMapRef} geometry={parcel} visible={true} />
+        {showRoads && <RoadLayer google={googleApi} map={googleMapRef} roads={roads} visible={true} />}
         {showTransactions && (
-          <TransactionMarkers google={googleApi} map={googleMapRef} transactions={transactions} />
+          <TransactionMarkers google={googleApi} map={googleMapRef} transactions={transactions} visible={true} />
         )}
         {comparables && <ComparableLayer google={googleApi} map={googleMapRef} comparables={comparables} />}
       </>
@@ -165,7 +167,7 @@ const MapView: React.FC<MapViewProps> = ({
 
   return (
     <div className="map-container">
-      {loading && MAP_PROVIDER === 'google' && !isLoaded && (
+      {!isLoaded && MAP_PROVIDER === 'google' && (
         <div className="map-loading">Loading map…</div>
       )}
       <div ref={mapRef} className="map-canvas" />
