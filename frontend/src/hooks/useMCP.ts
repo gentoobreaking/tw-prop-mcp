@@ -48,12 +48,15 @@ export function useMCP(): UseMCPResult {
   }, []);
 
   useEffect(() => {
-    // Only auto-load if we have an API URL configured
-    if (import.meta.env.VITE_MCP_SERVER_URL) {
+    // Use runtime-config injected URL, fallback to build-time env
+    const runtimeUrl = (typeof window !== 'undefined' &&
+      (window as unknown as { RUNTIME_CONFIG?: { MCP_SERVER_URL?: string } }).RUNTIME_CONFIG?.MCP_SERVER_URL) ||
+      import.meta.env.VITE_MCP_SERVER_URL;
+    if (runtimeUrl) {
       void loadData();
     } else {
       setLoading(false);
-      setError('MCP server URL not configured. Set VITE_MCP_SERVER_URL in .env');
+      setError('MCP server URL not configured. Set MCP_SERVER_URL in runtime config.');
     }
   }, [loadData]);
 
