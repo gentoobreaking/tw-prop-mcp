@@ -50,9 +50,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	mcpapi "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"tw-prop-mcp/internal/repository"
 )
 
@@ -96,6 +97,19 @@ func NewServer(config ServerConfig) *Server {
 		metrics:       newMetrics(),
 		configVersion: config.ConfigurationVersion,
 		snapshotID:    config.SnapshotID,
+	}
+	// Initialize database repositories if DSN configured
+	if config.DatabaseDSN != "" {
+		ctx := context.Background()
+		pool, err := pgxpool.New(ctx, config.DatabaseDSN)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "tw-prop-mcp: failed to open database: %v\n", err)
+		} else if err := pool.Ping(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "tw-prop-mcp: database ping failed: %v\n", err)
+		} else {
+			s.ParcelRepo = repository.NewParcelRepository(pool)
+			s.TxRepo = repository.NewTransactionRepository(pool)
+		}
 	}
 	s.registerTools()
 	s.registerResources()

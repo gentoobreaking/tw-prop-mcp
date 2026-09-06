@@ -135,5 +135,5 @@ func searchParcelsHandler(s *Server) func(ctx context.Context, req *mcpapi.CallT
 }
 
 func (s *Server) getParcelRepository() repository.ParcelRepository {
-	return nil
+	return s.ParcelRepo
 }

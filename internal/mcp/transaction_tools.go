@@ -189,10 +189,7 @@ func (s *Server) getTransactionService() *service.TransactionService {
 }
 
 func (s *Server) getTransactionRepository() repository.TransactionRepository {
-	if s.config.DatabaseDSN != "" {
-		// Would create real DB-backed repo here
-	}
-	return nil
+	return s.TxRepo
 }
 
 // checkAIIsolation validates that the raw tool arguments don't contain
