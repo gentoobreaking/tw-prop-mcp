@@ -79,10 +79,19 @@ export interface Parcel {
  *  When epsg=4326, geometry is in EPSG:4326; otherwise EPSG:3826.
  */
 export interface ParcelGeometry {
-  geometry: GeoMultiPolygon;
-  centroid: LatLng;
-  bbox: LatLngBounds;
+  /** WKT or WKT-with-EWKT prefix (e.g. "MULTIPOLYGON(((...)))") from backend */
+  geometry: string;
+  /** WKT POINT string for centroid (e.g. "POINT(lng lat)") */
+  centroid: string;
+  /** WKT POLYGON string for bounding box */
+  bbox: string;
   area_sqm: number;
+  /** WKT POINT in EPSG:4326 when epsg=4326 requested */
+  centroid_4326?: string;
+  /** Parsed centroid as LatLng — populated by frontend after WKT parsing */
+  centroidLatLng?: LatLng;
+  /** Parsed bounding box as LatLngBounds */
+  bboxLatLng?: LatLngBounds;
   /** Official cadastral area from the database */
   official_area_sqm?: number;
   /** GIS-calculated area; visible mismatch if differs from official */

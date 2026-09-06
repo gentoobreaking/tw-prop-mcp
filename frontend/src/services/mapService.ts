@@ -1,124 +1,83 @@
 /**
- * Map service — converts MCP domain data into Google Maps renderable types.
+ * Map service — converts MCP WKT geometry data into Google Maps renderable types.
  *
- * Converts GeoJSON [lng, lat] coordinate tuples to google.maps.LatLngLiteral.
- * MCP server returns EPSG:4326 (lat/lng) — no coordinate transformation needed.
+ * MCP server returns WKT strings (EPSG:4326 lat/lng). No coordinate transform needed.
  */
 
 import type {
-  GeoPolygon,
-  GeoMultiPolygon,
-  GeoMultiLineString,
-  GeoPoint,
   LatLng,
-  LatLngBounds,
   ParcelGeometry,
   Transaction,
-  RoadSegment,
-  ComparableResult,
 } from '../types';
-
-/** Convert [lng, lat] pair to google.maps.LatLngLiteral */
-export function toLatLng(coords: [number, number]): LatLng {
-  return { lat: coords[1], lng: coords[0] };
-}
-
-/** Convert GeoJSON coordinates array to LatLng literals */
-export function toLatLngs(coords: number[][]): LatLng[] {
-  return coords.map((c) => toLatLng([c[0], c[1]]));
-}
-
-/** Convert a GeoJSON polygon to google.maps path */
-export function polygonToPath(poly: GeoPolygon): LatLng[] {
-  return toLatLngs(poly.coordinates[0]);
-}
-
-/** Convert a GeoJSON MultiPolygon to array of paths */
-export function multiPolygonToPaths(mpoly: GeoMultiPolygon): LatLng[][] {
-  return mpoly.coordinates.map((poly) => toLatLngs(poly[0]));
-}
-
-/** Convert a GeoJSON MultiLineString to array of paths */
-export function multiLineStringToPaths(mls: GeoMultiLineString): LatLng[][] {
-  return mls.coordinates.map((line) => toLatLngs(line));
-}
-
-/** Convert a GeoJSON Point to google.maps.LatLng */
-export function pointToLatLng(point: GeoPoint): LatLng {
-  return toLatLng(point.coordinates);
-}
-
-/** Build google.maps.LatLngBounds from bounds object */
-export function boundsToGoogleBounds(bounds: {
-  northeast: LatLng;
-  southwest: LatLng;
-}): google.maps.LatLngBounds {
-  return new google.maps.LatLngBounds(bounds.southwest, bounds.northeast);
-}
-
-/** Extract all LatLngs from a parcel geometry */
-export function parcelGeometryToPaths(parcel: ParcelGeometry): LatLng[][] {
-  return multiPolygonToPaths(parcel.geometry);
-}
-
-/** Extract marker positions from transactions */
-export function transactionsToMarkers(transactions: Transaction[]): LatLng[] {
-  return transactions.filter((t) => t.location).map((t) => t.location!);
-}
-
-/** Extract road paths from road segments */
-export function roadsToPaths(roads: RoadSegment[]): LatLng[][] {
-  return roads.filter((r) => r.geometry).flatMap((r) => multiLineStringToPaths(r.geometry));
-}
-
-/** Extract comparable marker positions */
-export function comparablesToMarkers(comps: ComparableResult[]): LatLng[] {
-  return comps.filter((c) => c.transaction?.location).map((c) => c.transaction.location!);
-}
-
-/** Compute bounds that encompass all given lat/lng points */
-export function computeUnionBounds(points: LatLng[]): LatLngBounds | null {
-  if (points.length === 0) return null;
-
-  let minLat = Infinity,
-    maxLat = -Infinity;
-  let minLng = Infinity,
-    maxLng = -Infinity;
-
-  for (const p of points) {
-    minLat = Math.min(minLat, p.lat);
-    maxLat = Math.max(maxLat, p.lat);
-    minLng = Math.min(minLng, p.lng);
-    maxLng = Math.max(maxLng, p.lng);
-  }
-
-  return {
-    northeast: { lat: maxLat, lng: maxLng },
-    southwest: { lat: minLat, lng: minLng },
-  };
-}
-
-/** Extract the first ring of the first polygon from a parcel geometry (single path) */
-export function parcelGeometryToPath(parcel: ParcelGeometry): LatLng[] {
-  const paths = parcelGeometryToPaths(parcel);
-  return paths[0] ?? [];
-}
-
-/** Compute bounding box from a parcel geometry */
-export function parcelGeometryToBounds(parcel: ParcelGeometry): LatLngBounds {
-  const paths = parcelGeometryToPaths(parcel);
-  const allPoints = paths.flat();
-  const bounds = computeUnionBounds(allPoints);
-  if (!bounds) {
-    return {
-      northeast: { lat: 0, lng: 0 },
-      southwest: { lat: 0, lng: 0 },
-    };
-  }
-  return bounds;
-}
 
 /** Convert a single transaction to a marker LatLng position */
 export function transactionToMarker(tx: Transaction): LatLng | null {
   return tx.location ?? null;
 }
+
+/** Parse WKT POINT string "POINT(lng lat)" → LatLng */
+export function wktPointToLatLng(wkt: string): LatLng | null {
+  const match = wkt.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+  if (!match) return null;
+  const lng = parseFloat(match[1]);
+  const lat = parseFloat(match[2]);
+  if (isNaN(lng) || isNaN(lat)) return null;
+  return { lat, lng };
+}
+
+/** Parse WKT POLYGON string → array of LatLng */
+export function wktPolygonToLatLngs(wkt: string): LatLng[] | null {
+  const match = wkt.match(/POLYGON\s*\(\s*\((.+)\)\s*\)/is);
+  if (!match) return null;
+  const ring = match[1].trim();
+  return ring.split(',').map((pair) => {
+    const [lng, str] = pair.trim().split(/\s+/);
+    const lat = parseFloat(str);
+    const lngNum = parseFloat(lng);
+    return { lat, lng: lngNum };
+  });
+}
+
+/** Parse WKT MULTIPOLYGON string → array of paths (each path is LatLng[]) */
+export function wktMultiPolygonToPaths(wkt: string): LatLng[][] | null {
+  // Strip SRID prefix: SRID=3826;MULTIPOLYGON → MULTIPOLYGON
+  const cleanWkt = wkt.replace(/^SRID=\d+;/i, '');
+  const match = cleanWkt.match(/MULTIPOLYGON\s*\(\s*(.+)\s*\)/is);
+  if (!match) return null;
+
+  const inner = match[1].trim();
+  // Split on )),( to separate polygons
+  const polygons = inner.split(/\)\s*,\s*\(\s*\(/).map((p) => {
+    const ring = p.replace(/^\(\(/, '').replace(/\)\s*$/, '').trim();
+    return ring.split(',').map((coord) => {
+      const [lng, str] = coord.trim().split(/\s+/);
+      const lat = parseFloat(str);
+      const lngNum = parseFloat(lng);
+      return { lat, lng: lngNum };
+    });
+  }).filter((path) => path.length > 0);
+
+  return polygons.length > 0 ? polygons : null;
+}
+
+/** Extract LatLng from a ParcelGeometry's centroid (WKT POINT string) */
+export function parcelCentroid(parcel: ParcelGeometry): LatLng | null {
+  if (parcel.centroidLatLng) return parcel.centroidLatLng;
+  if (parcel.centroid_4326) {
+    return wktPointToLatLng(parcel.centroid_4326);
+  }
+  if (typeof parcel.centroid === 'string') {
+    return wktPointToLatLng(parcel.centroid);
+  }
+  return null;
+}
+
+/** Parse WKT MULTIPOLYGON and return LatLng paths for map rendering */
+export function parcelGeometryToLatLngPaths(parcel: ParcelGeometry): LatLng[][] | null {
+  const wkt = parcel.geometry;
+  if (typeof wkt === 'string') {
+    return wktMultiPolygonToPaths(wkt);
+  }
+  return null;
+}
+

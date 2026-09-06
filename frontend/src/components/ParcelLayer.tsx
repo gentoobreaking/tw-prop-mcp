@@ -1,13 +1,13 @@
 /**
  * ParcelLayer — renders the target parcel polygon on the Google Map.
  *
- * Geometry is sourced from the MCP `get_parcel_geometry` tool (PostGIS-backed).
+ * Geometry is sourced from MCP `get_parcel_geometry` as WKT MULTIPOLYGON string.
  * The frontend only converts coordinate representation, never computes geometry.
  * (SPEC §4.8: Google Maps is visualization only.)
  */
 
 import { useEffect, useRef } from 'react';
-import { parcelGeometryToBounds, parcelGeometryToPath } from '../services/mapService';
+import { parcelGeometryToLatLngPaths } from '../services/mapService';
 import type { ParcelGeometry } from '../types';
 
 export interface ParcelLayerProps {
@@ -40,11 +40,17 @@ export function ParcelLayer({
 
     if (!visible || !geometry) return;
 
-    const paths = parcelGeometryToPath(geometry);
-    if (paths.length === 0) return;
+    // Parse WKT MULTIPOLYGON into LatLng paths
+    const paths = parcelGeometryToLatLngPaths(geometry);
+    if (!paths || paths.length === 0) return;
+
+    // Convert LatLng to google.maps.LatLngLiteral
+    const googlePaths = paths.map((path) =>
+      path.map((p) => ({ lat: p.lat, lng: p.lng })),
+    );
 
     polygonRef.current = new google.maps.Polygon({
-      paths,
+      paths: googlePaths,
       strokeColor: '#1976d2',
       strokeOpacity: 0.85,
       strokeWeight: 3,
@@ -57,14 +63,24 @@ export function ParcelLayer({
 
     // Optionally fit the map viewport to the parcel bounds
     if (fitBounds) {
-      const bounds = parcelGeometryToBounds(geometry);
-      const gBounds = new google.maps.LatLngBounds(
-        { lat: bounds.south, lng: bounds.west },
-        { lat: bounds.north, lng: bounds.east }
-      );
-      map.fitBounds(gBounds, 48);
-      onBoundsFit?.(bounds);
+      const gBounds = polygonRef.current.getBounds();
+      if (gBounds) {
+        map.fitBounds(gBounds, 48);
+        onBoundsFit?.({
+          north: gBounds.getNorthEast().lat(),
+          south: gBounds.getSouthWest().lat(),
+          east: gBounds.getNorthEast().lng(),
+          west: gBounds.getSouthWest().lng(),
+        });
+      }
     }
+
+    return () => {
+      if (polygonRef.current) {
+        polygonRef.current.setMap(null);
+        polygonRef.current = null;
+      }
+    };
   }, [map, google, geometry, visible, fitBounds, onBoundsFit]);
 
   // Cleanup on unmount

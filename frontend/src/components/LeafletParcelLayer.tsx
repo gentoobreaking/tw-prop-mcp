@@ -4,13 +4,14 @@
  * Per SPEC §12: selected parcel geometry must be visually distinguishable.
  * Per SPEC §12.1: clicking a parcel identifies it and opens Parcel Inspector.
  *
- * Geometry comes from MCP `get_parcel_geometry` as GeoJSON MultiPolygon
- * (coordinates in [lng, lat] = EPSG:4326).
+ * Geometry comes from MCP `get_parcel_geometry` as WKT MULTIPOLYGON string.
+ * Coordinates are in EPSG:4326 (lng, lat) when epsg=4326 is requested.
  */
 
 import React from 'react';
 import L from 'leaflet';
 import type { ParcelGeometry } from '../types';
+import { wktMultiPolygonToPaths, parcelCentroid } from '../services/mapService';
 
 interface LeafletParcelLayerProps {
   map: L.Map | null;
@@ -22,43 +23,14 @@ export const LeafletParcelLayer: React.FC<LeafletParcelLayerProps> = ({ map, par
   React.useEffect(() => {
     if (!parcel || !map) return;
 
-    const geometry = parcel.geometry;
+    const paths = wktMultiPolygonToPaths(parcel.geometry);
+    if (!paths || paths.length === 0) return;
 
-    // Build GeoJSON from the geometry
-    let geojson: GeoJSON.GeoJSON;
-
-    if (geometry && typeof geometry === 'object' && 'type' in geometry) {
-      geojson = geometry as GeoJSON.GeoJSON;
-    } else {
-      // Fallback: if geometry is a WKT string, parse it
-      // This handles backward compat with older MCP responses
-      const wkt = String(geometry);
-      if (wkt.startsWith('MULTIPOLYGON')) {
-        const cleaned = wkt
-          .replace('MULTIPOLYGON((', '')
-          .replace('))', '')
-          .trim();
-        const coords = cleaned
-          .split('),(')
-          .map((ring) =>
-            ring
-              .replace('(', '')
-              .replace(')', '')
-              .trim()
-              .split(',')
-              .map((pair) => {
-                const [lng, lat] = pair.trim().split(' ').map(Number);
-                return [lng, lat] as [number, number];
-              }),
-          );
-        geojson = {
-          type: 'MultiPolygon',
-          coordinates: [coords],
-        };
-      } else {
-        return; // Cannot parse
-      }
-    }
+    // Build GeoJSON from the parsed WKT paths
+    const geojson: GeoJSON.GeoJSON = {
+      type: 'MultiPolygon',
+      coordinates: paths.map((path) => [path.map((p) => [p.lng, p.lat])]),
+    };
 
     const layer = L.geoJSON(geojson, {
       style: {
@@ -81,6 +53,14 @@ export const LeafletParcelLayer: React.FC<LeafletParcelLayerProps> = ({ map, par
     const bounds = layer.getBounds();
     if (bounds.isValid()) {
       map.flyToBounds(bounds, { padding: [50, 50] });
+    }
+
+    // Center map on centroid if available (fallback)
+    const centroid = parcelCentroid(parcel);
+    if (centroid) {
+      if (!bounds.isValid()) {
+        map.setView([centroid.lat, centroid.lng], 16);
+      }
     }
 
     return () => {
