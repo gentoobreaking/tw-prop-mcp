@@ -1,3 +1,9 @@
+<div align="center">
+
+[English](README.md) | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
+
+</div>
+
 # 台湾实价登录 MCP 服务器
 
 > 基于内政部实价登录数据（来自台湾不动产交易登记）的 MCP 服务器。具备确定性、可重现性与 AI 隔离特性。

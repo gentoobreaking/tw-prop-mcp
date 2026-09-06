@@ -1,3 +1,9 @@
+<div align="center">
+
+[English](README.md) | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
+
+</div>
+
  # 臺灣實價登錄 MCP 伺服器
 
 > 基於內政部實價登錄資料的 MCP Server，具備確定性、可重現性與 AI 隔離特性。
