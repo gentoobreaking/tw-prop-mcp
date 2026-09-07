@@ -180,6 +180,17 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         />
       </div>
 
+      {/* Transaction Type */}
+      <div className="filter-group">
+        <label className="filter-label">交易類型</label>
+        <input
+          type="text"
+          placeholder="如: 房地買賣，土地交易"
+          value={filters.transactionType ?? ''}
+          onChange={(e) => onFiltersChange({ transactionType: e.target.value || undefined })}
+          className="filter-input"
+        />
+      </div>
       {/* Action buttons */}
       <div className="filter-actions">
         <button type="button" className="filter-apply" onClick={onApply}>

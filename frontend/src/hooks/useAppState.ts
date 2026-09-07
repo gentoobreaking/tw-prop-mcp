@@ -692,6 +692,7 @@ export function useAppState() {
           district: identity.district,
           section: identity.section,
           landNumber: identity.landNumber,
+          transactionType: filters.transactionType,
           dateFrom,
           dateTo,
           limit: 100,
