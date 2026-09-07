@@ -102,18 +102,8 @@ const MapView: React.FC<MapViewProps> = ({
     showNLSC,
   });
 
-  // Initialize the appropriate map provider
-  useEffect(() => {
-    if (MAP_PROVIDER === 'google') {
-      if (isLoaded && mapRef.current) {
-        void initGoogleMap();
-      }
-    } else {
-      void initLeafletMap();
-    }
-  }, [isLoaded, initGoogleMap, initLeafletMap, showSatellite, showStreetView, showNLSC, parcel, transactions, roads, comparables, mapContext]);
-
-  // Capture map instance from map-ready event
+  // Initialize map and capture map instance
+  // Order matters: add map-ready listener BEFORE calling init to avoid race condition
   useEffect(() => {
     const handleMapReady = (e: CustomEvent) => {
       const mapInstance = e.detail?.map;
@@ -125,10 +115,19 @@ const MapView: React.FC<MapViewProps> = ({
       }
     };
     window.addEventListener('map-ready', handleMapReady as EventListener);
+
+    if (MAP_PROVIDER === 'google') {
+      if (isLoaded && mapRef.current) {
+        void initGoogleMap();
+      }
+    } else {
+      void initLeafletMap();
+    }
+
     return () => {
       window.removeEventListener('map-ready', handleMapReady as EventListener);
     };
-  }, []);
+  }, [isLoaded, initGoogleMap, initLeafletMap, showSatellite, showStreetView, showNLSC]);
 
   // Render Google Maps layers
   const renderGoogleLayers = () => {
@@ -171,7 +170,7 @@ const MapView: React.FC<MapViewProps> = ({
   }
 
   return (
-    <div className="map-container">
+    <div className="map-container" ref={mapRef}>
       {!isLoaded && MAP_PROVIDER === 'google' && (
         <div className="map-loading">Loading map…</div>
       )}

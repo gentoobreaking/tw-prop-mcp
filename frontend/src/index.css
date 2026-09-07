@@ -1,3 +1,6 @@
+/* Leaflet map styles — required for map container/pane rendering */
+@import 'leaflet/dist/leaflet.css';
+
 * {
   margin: 0;
   padding: 0;

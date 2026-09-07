@@ -86,8 +86,9 @@ export function useLeafletMap({ mapRef, data, showSatellite, showStreetView, sho
       if (showStreetView) {
         console.warn('[Leaflet] Street View not supported — requires Google Maps');
       }
-
       window.dispatchEvent(new CustomEvent('map-ready', { detail: { map } }));
+      // Invalidate size to ensure correct rendering after layout settles
+      setTimeout(() => map.invalidateSize(), 100);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[Leaflet] Failed to initialize map:', err);
@@ -125,34 +126,14 @@ export function useLeafletMap({ mapRef, data, showSatellite, showStreetView, sho
     }
   }, [showSatellite, showNLSC]);
 
-  // Fit to data when mapContext changes
+  // Cleanup map on unmount
   useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !data.map_context) return;
-
-    const ctx = data.map_context;
-    if (ctx.bounds) {
-      const bounds: L.LatLngBoundsExpression = [
-        [ctx.bounds.south, ctx.bounds.west],
-        [ctx.bounds.north, ctx.bounds.east],
-      ];
-      map.flyToBounds(bounds, { padding: [50, 50] });
-    } else {
-      map.setView([ctx.latitude, ctx.longitude], ctx.zoom);
-    }
-  }, [data.map_context]);
-
-  // Initial map setup — runs once
-  useEffect(() => {
-    void initializeMap();
     return () => {
-      // Cleanup on unmount
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, []);
   return { initializeMap };
 }

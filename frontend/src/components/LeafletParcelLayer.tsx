@@ -23,23 +23,24 @@ export const LeafletParcelLayer: React.FC<LeafletParcelLayerProps> = ({ map, par
   React.useEffect(() => {
     if (!parcel || !map) return;
 
+    // Ensure map size is correct before rendering overlay
+    map.invalidateSize({ pan: false });
+
     const paths = wktMultiPolygonToPaths(parcel.geometry);
     if (!paths || paths.length === 0) return;
 
-    // Build GeoJSON from the parsed WKT paths
-    const geojson: GeoJSON.GeoJSON = {
-      type: 'MultiPolygon',
-      coordinates: paths.map((path) => [path.map((p) => [p.lng, p.lat])]),
-    };
+    // Build LatLng arrays for Leaflet polygon rendering
+    // paths is LatLng[][] (array of polygons, each polygon is a ring of LatLng)
+    const latlngs: L.LatLngExpression[][] = paths.map((path) =>
+      path.map((p) => L.latLng(p.lat, p.lng))
+    );
 
-    const layer = L.geoJSON(geojson, {
-      style: {
-        color: '#1a73e8',
-        weight: 3,
-        opacity: 0.9,
-        fillColor: '#1a73e8',
-        fillOpacity: 0.15,
-      },
+    const layer = L.polygon(latlngs, {
+      color: '#1a73e8',
+      weight: 3,
+      opacity: 0.9,
+      fillColor: '#1a73e8',
+      fillOpacity: 0.15,
     }).addTo(map);
 
     // Bind click handler to open Parcel Inspector (SPEC §12.1)
