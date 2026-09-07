@@ -196,6 +196,28 @@ func ParseROCDate(s string) (time.Time, error) {
 		y = rocToAD(y)
 		return validateDate(y, mo, d, orig)
 	}
+	// Handle digit-only ROC date like 1100101 (110/01/01) or 1061231
+	if isAllDigits(s) {
+		switch len(s) {
+		case 7: // e.g., 1100101 -> 110/01/01
+			y, _ := strconv.Atoi(s[0:3])
+			mo, _ := strconv.Atoi(s[3:5])
+			d, _ := strconv.Atoi(s[5:7])
+			y = rocToAD(y)
+			return validateDate(y, mo, d, orig)
+		case 6: // e.g., 990101 -> 99/01/01
+			y, _ := strconv.Atoi(s[0:2])
+			mo, _ := strconv.Atoi(s[2:4])
+			d, _ := strconv.Atoi(s[4:6])
+			y = rocToAD(y)
+			return validateDate(y, mo, d, orig)
+		case 8: // e.g., 20210101
+			y, _ := strconv.Atoi(s[0:4])
+			mo, _ := strconv.Atoi(s[4:6])
+			d, _ := strconv.Atoi(s[6:8])
+			return validateDate(y, mo, d, orig)
+		}
+	}
 
 	// Normalize separators to "/"
 	// Handle -, ., /
@@ -222,6 +244,15 @@ func ParseROCDate(s string) (time.Time, error) {
 	}
 	y = rocToAD(y)
 	return validateDate(y, mo, d, orig)
+}
+
+func isAllDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 func rocToAD(y int) int {

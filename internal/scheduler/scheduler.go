@@ -84,6 +84,50 @@ type Scheduler struct {
 	config Config
 	logger *slog.Logger
 	mu     sync.Mutex
+
+	progressMu sync.RWMutex
+	progress   ImportProgress
+}
+// ImportProgress tracks current import for frontend polling.
+type ImportProgress struct {
+	Running   bool       `json:"running"`
+	Stage     string     `json:"stage"`
+	Percent   int        `json:"percent"`
+	Message   string     `json:"message"`
+	StartedAt *time.Time `json:"started_at,omitempty"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	Error     string     `json:"error,omitempty"`
+}
+
+// GetProgress returns a copy of current import progress for polling.
+func (s *Scheduler) GetProgress() any {
+	s.progressMu.RLock()
+	defer s.progressMu.RUnlock()
+	return s.progress
+}
+func (s *Scheduler) setProgress(running bool, stage string, percent int, msg string) {
+	s.progressMu.Lock()
+	defer s.progressMu.Unlock()
+	now := time.Now()
+	if running && s.progress.StartedAt == nil {
+		s.progress.StartedAt = &now
+	}
+	if !running {
+		s.progress.StartedAt = nil
+	}
+	s.progress.Running = running
+	s.progress.Stage = stage
+	s.progress.Percent = percent
+	s.progress.Message = msg
+	s.progress.Error = ""
+	s.progress.UpdatedAt = now
+}
+func (s *Scheduler) setProgressError(errMsg string) {
+	s.progressMu.Lock()
+	defer s.progressMu.Unlock()
+	s.progress.Running = false
+	s.progress.Error = errMsg
+	s.progress.UpdatedAt = time.Now()
 }
 
 // New creates a Scheduler.
@@ -155,35 +199,39 @@ func (s *Scheduler) CheckAndRefresh(ctx context.Context) (bool, error) {
 		s.logger.Info("auto refresh disabled, skipping")
 		return false, nil
 	}
-	// Guard concurrent refresh
 	if !s.mu.TryLock() {
 		s.logger.Info("refresh already in progress, skipping")
 		return false, nil
 	}
 	defer s.mu.Unlock()
 
+	s.setProgress(true, "checking", 5, "檢查資料新鮮度")
 	stale, reason := s.IsStale(ctx)
 	s.logger.Info("freshness check", "stale", stale, "reason", reason, "freshness_days", s.config.FreshnessDays)
 	if !stale {
+		s.setProgress(false, "idle", 100, "資料已是最新")
 		return false, nil
 	}
 
-	// Resolve download URL
+	s.setProgress(true, "discovering", 10, "尋找最新資料")
 	url := s.config.DataImportURL
 	if url == "" && s.config.AutoDiscover {
 		s.logger.Info("auto-discovering latest MOI URL")
 		discovered, err := downloader.AutoDiscoverLatestURL(ctx)
 		if err != nil {
+			s.setProgressError(fmt.Sprintf("auto-discover failed: %v", err))
 			return false, fmt.Errorf("auto-discover failed: %w", err)
 		}
 		url = discovered
 		s.logger.Info("auto-discovered URL", "url", url)
+		s.setProgress(true, "downloading", 20, "已找到最新資料，準備下載")
 	}
 	if url == "" {
+		s.setProgressError("no DATA_IMPORT_URL and auto-discover disabled")
 		return false, fmt.Errorf("no DATA_IMPORT_URL and auto-discover disabled or failed")
 	}
 
-	// Run import pipeline
+	s.setProgress(true, "downloading", 30, "下載中")
 	s.logger.Info("starting auto import", "url", url)
 	snapshotID := uuid.NewString()
 	pipeline := importpipeline.NewImportPipeline(importpipeline.PipelineConfig{
@@ -191,19 +239,51 @@ func (s *Scheduler) CheckAndRefresh(ctx context.Context) (bool, error) {
 		DownloadURL: url,
 	}, s.logger)
 
-	// Wire repositories
 	snapshotRepo := repository.NewSnapshotRepository(s.pool)
 	txRepo := repository.NewTransactionRepository(s.pool)
 	parcelRepo := repository.NewParcelRepository(s.pool)
 	pipeline.SetRepositories(txRepo, parcelRepo, snapshotRepo)
 	pipeline.SetDB(s.pool)
 
+	s.setProgress(true, "importing", 50, "匯入中 (解析 → 驗證 → 入庫)")
 	result, err := pipeline.ImportFromSource(ctx)
 	if err != nil {
 		s.logger.Error("auto import failed", "error", err, "snapshot_id", snapshotID)
+		s.setProgressError(fmt.Sprintf("import failed: %v", err))
 		return false, err
 	}
 	s.logger.Info("auto import succeeded", "snapshot_id", snapshotID, "transactions", result.TransactionsImported, "parcels", result.ParcelsImported, "duration", result.Duration)
+	s.setProgress(false, "done", 100, fmt.Sprintf("完成：%d 筆交易、%d 筆地號", result.TransactionsImported, result.ParcelsImported))
+	return true, nil
+}
+
+// ImportLocalZip imports a local lvr_landcsv.zip file (manual upload).
+func (s *Scheduler) ImportLocalZip(ctx context.Context, zipPath string) (bool, error) {
+	if !s.mu.TryLock() {
+		return false, fmt.Errorf("import already in progress")
+	}
+	defer s.mu.Unlock()
+	if _, err := os.Stat(zipPath); err != nil {
+		return false, fmt.Errorf("zip not found: %w", err)
+	}
+	s.setProgress(true, "importing", 10, "手動匯入 zip 中")
+	snapshotID := uuid.NewString()
+	pipeline := importpipeline.NewImportPipeline(importpipeline.PipelineConfig{
+		SnapshotID:  snapshotID,
+		DownloadURL: zipPath, // local file, download stage will use it directly
+	}, s.logger)
+	snapshotRepo := repository.NewSnapshotRepository(s.pool)
+	txRepo := repository.NewTransactionRepository(s.pool)
+	parcelRepo := repository.NewParcelRepository(s.pool)
+	pipeline.SetRepositories(txRepo, parcelRepo, snapshotRepo)
+	pipeline.SetDB(s.pool)
+	s.setProgress(true, "importing", 50, "解析 zip 中")
+	result, err := pipeline.ImportFromSource(ctx)
+	if err != nil {
+		s.setProgressError(fmt.Sprintf("zip import failed: %v", err))
+		return false, err
+	}
+	s.setProgress(false, "done", 100, fmt.Sprintf("zip 匯入完成：%d 筆交易、%d 筆地號", result.TransactionsImported, result.ParcelsImported))
 	return true, nil
 }
 

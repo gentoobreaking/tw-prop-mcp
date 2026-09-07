@@ -46,8 +46,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -86,6 +88,8 @@ type Server struct {
 	Scheduler     interface {
 		IsStale(ctx context.Context) (bool, string)
 		CheckAndRefresh(ctx context.Context) (bool, error)
+		GetProgress() any
+		ImportLocalZip(ctx context.Context, zipPath string) (bool, error)
 	}
 }
 func NewServer(config ServerConfig) *Server {
@@ -174,14 +178,15 @@ func (s *Server) RunHTTP(ctx context.Context) error {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
-	// Readiness probe — reflects whether the server can handle requests.
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ready","tools_registered":true}`))
 	})
-	// Prometheus metrics endpoint (Spec T024: observability)
 	mux.Handle("/metrics", promhttp.Handler())
+	// Admin: manual zip upload and progress polling for frontend
+	mux.HandleFunc("/admin/import", s.handleAdminImport)
+	mux.HandleFunc("/admin/progress", s.handleAdminProgress)
 
 	addr := s.config.HTTPAddr
 	if addr == "" {
@@ -200,6 +205,82 @@ func (s *Server) RunHTTP(ctx context.Context) error {
 	return httpSrv.ListenAndServe()
 }
 
+func (s *Server) handleAdminProgress(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "content-type")
+		w.WriteHeader(204)
+		return
+	}
+	if s.Scheduler == nil {
+		w.Write([]byte(`{"running":false,"stage":"idle","percent":0,"message":"scheduler not configured"}`))
+		return
+	}
+	progress := s.Scheduler.GetProgress()
+	b, _ := json.Marshal(progress)
+	w.Write(b)
+}
+
+func (s *Server) handleAdminImport(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "content-type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(204)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.Scheduler == nil {
+		http.Error(w, `{"error":"scheduler not configured"}`, http.StatusServiceUnavailable)
+		return
+	}
+	// 32MB max
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"parse form: %v"}`, err), http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, `{"error":"file field required (name=file)"}`, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	if !isZipFile(header.Filename) {
+		http.Error(w, `{"error":"only .zip allowed (lvr_landcsv.zip)"}`, http.StatusBadRequest)
+		return
+	}
+	tmpPath := fmt.Sprintf("%s/%s", os.TempDir(), header.Filename)
+	dst, err := os.Create(tmpPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"create temp: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+	if _, err := io.Copy(dst, file); err != nil {
+		dst.Close()
+		http.Error(w, fmt.Sprintf(`{"error":"save file: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+	dst.Close()
+	// Trigger import in background
+	go func(path string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		defer os.Remove(path)
+		_, _ = s.Scheduler.ImportLocalZip(ctx, path)
+	}(tmpPath)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"started":true,"message":"zip upload received, import started in background; poll /admin/progress"}`))
+}
+
+func isZipFile(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".zip")
+}
 // ExposedServer returns the underlying MCP SDK server for testing.
 func (s *Server) ExposedServer() *mcpapi.Server {
 	return s.server

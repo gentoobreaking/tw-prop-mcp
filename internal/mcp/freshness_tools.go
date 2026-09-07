@@ -2,12 +2,12 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	mcpapi "github.com/modelcontextprotocol/go-sdk/mcp"
 )
-
 // --- Freshness Tools ---
 
 func registerFreshnessTools(srv *mcpapi.Server, s *Server) {
@@ -24,6 +24,13 @@ func registerFreshnessTools(srv *mcpapi.Server, s *Server) {
 			Description: "Manually trigger data refresh if stale. Runs in background and returns immediately; poll get_data_freshness for completion.",
 		},
 		instrument(s, "trigger_data_refresh", "", triggerDataRefreshHandler(s)),
+	)
+	mcpapi.AddTool(srv,
+		&mcpapi.Tool{
+			Name:        "get_import_progress",
+			Description: "Get current import progress for polling after trigger_data_refresh. Returns stage, percent, and message for progress bar.",
+		},
+		instrument(s, "get_import_progress", "", getImportProgressHandler(s)),
 	)
 }
 
@@ -167,9 +174,58 @@ func triggerDataRefreshHandler(s *Server) func(ctx context.Context, req *mcpapi.
 		}()
 		return nil, triggerDataRefreshOutput{
 			Started: true,
-			Message: "refresh started in background; poll get_data_freshness for completion",
+			Message: "refresh started in background; poll get_import_progress for completion",
 			IsStale: stale,
 			Reason:  reason,
 		}, nil
+	}
+}
+type getImportProgressOutput struct {
+	Running   bool    `json:"running"`
+	Stage     string  `json:"stage"`
+	Percent   int     `json:"percent"`
+	Message   string  `json:"message"`
+	StartedAt *string `json:"started_at,omitempty"`
+	UpdatedAt string  `json:"updated_at"`
+	Error     string  `json:"error,omitempty"`
+}
+
+func getImportProgressHandler(s *Server) func(ctx context.Context, req *mcpapi.CallToolRequest, input struct{}) (*mcpapi.CallToolResult, getImportProgressOutput, error) {
+	return func(ctx context.Context, req *mcpapi.CallToolRequest, input struct{}) (*mcpapi.CallToolResult, getImportProgressOutput, error) {
+		if mce := checkAIIsolation(req); mce != nil {
+			return mcpErrorResult(mce), getImportProgressOutput{}, nil
+		}
+		if s.Scheduler == nil {
+			return nil, getImportProgressOutput{
+				Running: false,
+				Stage:   "idle",
+				Percent: 0,
+				Message: "scheduler not configured",
+			}, nil
+		}
+		raw := s.Scheduler.GetProgress()
+		// Marshal raw (scheduler.ImportProgress) to JSON then unmarshal to output
+		// This avoids import cycle by using JSON as bridge
+		b, err := json.Marshal(raw)
+		if err != nil {
+			return nil, getImportProgressOutput{
+				Running: false,
+				Stage:   "unknown",
+				Percent: 0,
+				Message: fmt.Sprintf("%v", raw),
+				Error:   err.Error(),
+			}, nil
+		}
+		var out getImportProgressOutput
+		if err := json.Unmarshal(b, &out); err != nil {
+			return nil, getImportProgressOutput{
+				Running: false,
+				Stage:   "unknown",
+				Percent: 0,
+				Message: fmt.Sprintf("%v", raw),
+				Error:   err.Error(),
+			}, nil
+		}
+		return nil, out, nil
 	}
 }

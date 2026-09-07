@@ -1,6 +1,7 @@
 package importpipeline
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -231,25 +232,42 @@ func (p *ImportPipeline) initSnapshot(ctx context.Context) error {
 		return nil // already exists
 	}
 
+	// Use snapshotID as fallback SHA to avoid unique violation when ExpectedChecksum is empty
+	// (e.g., manual zip upload where SHA is computed after download)
+	fileSHA := p.Config.ExpectedChecksum
+	if fileSHA == "" {
+		// Generate deterministic but unique SHA from snapshotID
+		h := sha256.Sum256([]byte(p.Config.SnapshotID))
+		fileSHA = hex.EncodeToString(h[:])
+	}
+
 	// Create new snapshot with the configured SnapshotID
 	_, err = p.SnapshotRepo.Create(ctx, repository.CreateSnapshotParams{
 		ID:            p.Config.SnapshotID,
 		Source:        "OFFICIAL_CSV",
 		SourceVersion: "v2.0",
 		FileName:      filepath.Base(p.Config.DownloadURL),
-		FileSHA256:    p.Config.ExpectedChecksum,
+		FileSHA256:    fileSHA,
 		RecordCount:   0,
 		Status:        domain.SnapshotStatusPending,
 		SchemaVersion: "v2.0",
 	})
 	return err
 }
-
 // download downloads the source file.
 func (p *ImportPipeline) download(ctx context.Context) (string, error) {
 	dest := p.Config.DownloadDest
 	if dest == "" {
 		dest = filepath.Join(os.TempDir(), fmt.Sprintf("import_%s", p.Config.SnapshotID))
+	}
+
+	// Manual zip: if DownloadURL is a local file path (e.g., /tmp/lvr_landcsv.zip or file://), just use it
+	if p.Config.DownloadURL != "" {
+		localPath := strings.TrimPrefix(p.Config.DownloadURL, "file://")
+		if _, err := os.Stat(localPath); err == nil {
+			p.Logger.Info("using local file instead of download", "path", localPath)
+			return localPath, nil
+		}
 	}
 
 	var lastErr error
@@ -296,8 +314,12 @@ func (p *ImportPipeline) verifyChecksum(path string) error {
 }
 
 // parse extracts and parses CSV from the archive.
+// Supports both single CSV and lvr_landcsv.zip (containing a_lvr_land_a.csv ...).
 func (p *ImportPipeline) parse(ctx context.Context, archivePath string) ([]map[string]string, error) {
-	// For now, assume direct CSV file (archive handling can be extended)
+	// Zip handling: lvr_landcsv.zip or any .zip containing CSVs
+	if strings.HasSuffix(strings.ToLower(archivePath), ".zip") {
+		return p.parseZip(ctx, archivePath)
+	}
 	rows, err := p.Parser.ParseOfficialCSV(archivePath)
 	if err != nil {
 		return nil, fmt.Errorf("parse CSV: %w", err)
@@ -306,7 +328,57 @@ func (p *ImportPipeline) parse(ctx context.Context, archivePath string) ([]map[s
 	return rows, nil
 }
 
-// moiAddressRe extracts section and land number from MOI parcel_address.
+// parseZip unzips lvr_landcsv.zip and parses all CSVs inside, merging rows.
+func (p *ImportPipeline) parseZip(ctx context.Context, zipPath string) ([]map[string]string, error) {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return nil, fmt.Errorf("open zip: %w", err)
+	}
+	defer r.Close()
+
+	var allRows []map[string]string
+	for _, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		lower := strings.ToLower(f.Name)
+		if !strings.HasSuffix(lower, ".csv") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			p.Logger.Warn("zip entry open failed", "file", f.Name, "error", err)
+			continue
+		}
+		rows, err := p.Parser.ParseCSV(ctx, rc)
+		rc.Close()
+		if err != nil {
+			p.Logger.Warn("parse CSV in zip failed", "file", f.Name, "error", err)
+			continue
+		}
+		// Enrich county from filename (e.g., a_lvr_land_a.csv -> 臺北市)
+		county := countyFromFilename(filepath.Base(f.Name))
+		if county != "" {
+			for _, row := range rows {
+				if row["county"] == "" {
+					row["county"] = county
+				}
+			}
+		}
+		p.Logger.Info("parsed CSV in zip", "file", f.Name, "rows", len(rows), "county", county)
+		allRows = append(allRows, rows...)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+	}
+	if len(allRows) == 0 {
+		return nil, fmt.Errorf("no CSV rows found in zip %s", zipPath)
+	}
+	p.Logger.Info("zip parsing completed", "total_rows", len(allRows))
+	return allRows, nil
+}
 // Example: "光華段二小段720-1地號" -> section="光華段二小段", land_number="720-1"
 var moiAddressRe = regexp.MustCompile(`(.+?段(?:(.)小段)?)(\d+(?:-\d+)?)地號`)
 
@@ -485,6 +557,11 @@ func (p *ImportPipeline) importData(ctx context.Context, transactions []domain.T
 		_ = tx.Rollback(ctx) // no-op if already committed
 	}()
 
+	// Create import_batch record for FK (required by transaction/parcel)
+	if _, err := tx.Exec(ctx, `INSERT INTO import_batch (id, snapshot_id, status) VALUES ($1, $2, 'RUNNING')`, importBatchID, p.Config.SnapshotID); err != nil {
+		return fmt.Errorf("create import_batch: %w", err)
+	}
+
 	// Import transactions
 	if len(transactions) > 0 {
 		for i := range transactions {
@@ -499,13 +576,15 @@ func (p *ImportPipeline) importData(ctx context.Context, transactions []domain.T
 
 	// Import parcels
 	if len(parcels) > 0 {
+		for i := range parcels {
+			parcels[i].ImportBatchID = importBatchID
+		}
 		inserted, err := parcelRepo.BatchInsert(ctx, parcels)
 		if err != nil {
 			return fmt.Errorf("batch insert parcels: %w", err)
 		}
 		p.Logger.Info("parcels inserted", "count", inserted)
 	}
-
 	// Lock snapshot within the same transaction — spec §62: COMMIT → LOCK
 	if err := snapshotRepo.Lock(ctx, p.Config.SnapshotID); err != nil {
 		return fmt.Errorf("lock snapshot: %w", err)

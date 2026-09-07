@@ -402,6 +402,21 @@ export async function triggerDataRefresh(force?: boolean): Promise<TriggerRefres
   });
 }
 
+export interface ImportProgress {
+  running: boolean;
+  stage: string;
+  percent: number;
+  message: string;
+  started_at?: string;
+  updated_at: string;
+  error?: string;
+}
+
+export async function getImportProgress(): Promise<ImportProgress> {
+  return callMCPTool<ImportProgress>('get_import_progress', {});
+}
+
+
 
 // --- Combined loader ---
 

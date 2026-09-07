@@ -80,9 +80,49 @@
 .freshness-refresh-btn:hover:not(:disabled) {
   background: #0284c7;
 }
+.freshness-upload-btn {
+  padding: 4px 10px;
+  border: 1px solid #6366f1;
+  background: #6366f1;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.freshness-upload-btn:hover {
+  background: #4f46e5;
+}
 .freshness-hint {
   color: #dc2626;
   font-size: 11px;
+}
+.freshness-progress {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.progress-bar-outer {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  height: 100%;
+  background: #0ea5e9;
+  transition: width 0.3s ease;
+}
+.progress-text {
+  font-size: 12px;
+  color: #334155;
+  white-space: nowrap;
+}
+.progress-error {
+  color: #dc2626;
+  font-size: 12px;
 }
 .freshness-msg {
   width: 100%;
