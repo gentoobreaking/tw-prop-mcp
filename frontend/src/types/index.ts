@@ -360,7 +360,7 @@ export interface McpError {
 export interface ViewData {
   parcel?: ParcelGeometry;
   transactions: Transaction[];
-  roads: RoadSegment[];
+  roads: (RoadSegment | NearbyRoad)[];
   comparables: ComparableResult[];
   valuation?: ValuationResult;
   map_context?: MapContext;

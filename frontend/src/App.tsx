@@ -387,24 +387,7 @@ const App: React.FC = () => {
             <MapView
               parcel={selectedParcel ?? undefined}
               transactions={transactions}
-              roads={
-                roadAccess
-                  ? [
-                      {
-                        road_id: '',
-                        name: '',
-                        width_source: roadAccess.source ?? '',
-                        geometry: { type: 'MultiLineString', coordinates: [] },
-                        distance_m: roadAccess.distance_m,
-                        access_type: roadAccess.status as
-                          | 'ROAD_ADJACENT'
-                          | 'ROAD_NEARBY'
-                          | 'NO_ROAD_DETECTED'
-                          | 'UNKNOWN',
-                      },
-                    ]
-                  : []
-              }
+              roads={nearbyRoads}
               comparables={comparables}
               showSatellite={layers.showSatellite}
               showStreetView={layers.showStreetView}
@@ -413,6 +396,7 @@ const App: React.FC = () => {
               showComparables={layers.showComparables}
               showTransactions={layers.showTransactions}
               mapContext={mapContext ?? undefined}
+              onParcelSelect={() => setActivePanel('parcel')}
             />
 
             {/* Layer controls overlay */}

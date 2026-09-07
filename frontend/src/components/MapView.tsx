@@ -17,6 +17,7 @@ import type {
   ParcelGeometry,
   Transaction,
   RoadSegment,
+  NearbyRoad,
   ComparableResult,
   MapContext,
   ViewData,
@@ -29,6 +30,8 @@ import { ComparableLayer } from './ComparableLayer';
 import { LeafletTransactionMarkers } from './LeafletTransactionMarkers';
 import { ParcelLayer } from './ParcelLayer';
 import { RoadLayer } from './RoadLayer';
+import { parcelCentroid } from '../services/mapService';
+import { StreetView } from './StreetView';
 import { TransactionMarkers } from './TransactionMarkers';
 import './MapView.css';
 import 'leaflet/dist/leaflet.css';
@@ -36,7 +39,7 @@ import 'leaflet/dist/leaflet.css';
 interface MapViewProps {
   parcel?: ParcelGeometry;
   transactions: Transaction[];
-  roads: RoadSegment[];
+  roads: (RoadSegment | NearbyRoad)[];
   comparables: ComparableResult[];
   showSatellite: boolean;
   showStreetView: boolean;
@@ -44,6 +47,7 @@ interface MapViewProps {
   showRoads: boolean;
   showComparables: boolean;
   showTransactions: boolean;
+  onParcelSelect?: () => void;
   mapContext?: MapContext;
 }
 
@@ -62,6 +66,7 @@ const MapView: React.FC<MapViewProps> = ({
   showRoads,
   showComparables,
   showTransactions,
+  onParcelSelect,
   mapContext,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -145,7 +150,7 @@ const MapView: React.FC<MapViewProps> = ({
     if (MAP_PROVIDER !== 'leaflet' || !leafletMap) return null;
     return (
       <>
-        <LeafletParcelLayer map={leafletMap} parcel={parcel ?? null} />
+        <LeafletParcelLayer map={leafletMap} parcel={parcel ?? null} onParcelClick={onParcelSelect} />
         {showRoads && <LeafletRoadLayer map={leafletMap} roads={roads} />}
         {showTransactions && (
           <LeafletTransactionMarkers map={leafletMap} transactions={transactions} />
@@ -170,9 +175,17 @@ const MapView: React.FC<MapViewProps> = ({
       {!isLoaded && MAP_PROVIDER === 'google' && (
         <div className="map-loading">Loading map…</div>
       )}
-      <div ref={mapRef} className="map-canvas" />
       {renderGoogleLayers()}
       {renderLeafletLayers()}
+      {MAP_PROVIDER === 'google' && showStreetView && (
+        <StreetView
+          visible={showStreetView}
+          location={parcel ? parcelCentroid(parcel) : null}
+          google={googleApi}
+          isGoogleLoaded={isLoaded}
+          provider="google"
+        />
+      )}
     </div>
   );
 };

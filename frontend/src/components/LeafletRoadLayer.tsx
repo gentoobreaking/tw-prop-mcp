@@ -1,10 +1,10 @@
 import React from 'react';
 import L from 'leaflet';
-import type { RoadSegment } from '../types';
+import type { RoadSegment, NearbyRoad } from '../types';
 
 interface LeafletRoadLayerProps {
   map: L.Map | null;
-  roads: RoadSegment[];
+  roads: (RoadSegment | NearbyRoad)[];
 }
 
 export const LeafletRoadLayer: React.FC<LeafletRoadLayerProps> = ({ map, roads }) => {
