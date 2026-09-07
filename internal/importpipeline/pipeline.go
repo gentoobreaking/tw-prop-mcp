@@ -396,16 +396,6 @@ var moiAddressRe = regexp.MustCompile(`(.+?段(?:(.)小段)?)(\d+(?:-\d+)?)地�
 // parseSectionLandNumber extracts section and land_number from the MOI
 // "土地位置建物門牌" (parcel_address) field.
 func parseSectionLandNumber(addr string) (section, landNumber string) {
-	if addr == "" {
-		return "", ""
-	}
-	m := moiAddressRe.FindStringSubmatch(addr)
-	if m == nil {
-		return "", ""
-	}
-	return m[1], m[3]
-}
-
 // countyFromFilename derives county name from MOI filename prefix.
 // Mapping is based on the official MOI real-price registration data manifest.
 var moiCountyMap = map[string]string{

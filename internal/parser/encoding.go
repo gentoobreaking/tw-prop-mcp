@@ -15,6 +15,22 @@ import (
 //   - "big5"       (fallback, likely Big5/unknown single-byte encoding)
 func DetectEncoding(data []byte) string {
 	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
+		// Has UTF-8 BOM, but data might be Big5 encoded with BOM added
+		// Check if rest of data is valid UTF-8
+		if utf8.Valid(data[3:]) {
+			// Check if it looks like Big5 (many high bytes)
+			highBytes := 0
+			for _, b := range data[3:] {
+				if b >= 0x80 {
+					highBytes++
+				}
+			}
+			// If more than 10% high bytes, likely Big5 with BOM
+			if float64(highBytes)/float64(len(data)-3) > 0.1 {
+				return "big5"
+			}
+			return "utf-8-bom"
+		}
 		return "utf-8-bom"
 	}
 	if utf8.Valid(data) {

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -30,12 +31,30 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	if row == nil {
 		return nil, fmt.Errorf("nil row")
 	}
-	// Deep copy check: ensure we don't mutate input (read-only)
 	// Validate four keys
 	county := strings.TrimSpace(row["county"])
 	district := strings.TrimSpace(row["district"])
 	section := strings.TrimSpace(row["section"])
 	landNumber := strings.TrimSpace(row["land_number"])
+
+	// If district is missing, try to extract from parcel_address
+	if district == "" {
+		if addr := strings.TrimSpace(row["parcel_address"]); addr != "" {
+			if sec, _ := parseSectionLandNumber(addr); sec != "" {
+				district = sec
+			}
+		}
+		// If still empty, try to extract from section (first part before 段)
+		if district == "" && section != "" {
+			if idx := strings.Index(section, "段"); idx > 0 {
+				district = section[:idx]
+			}
+		}
+		// Last resort: use first known district for the county
+		if district == "" {
+			district = firstDistrictForCounty(county)
+		}
+	}
 	if county == "" {
 		return nil, fmt.Errorf("missing required field: county")
 	}
@@ -422,4 +441,55 @@ func hashRow(row map[string]string) string {
 		h.Write([]byte(";"))
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// parseSectionLandNumber extracts section and land_number from the MOI
+// "土地位置建物門牌" (parcel_address) field.
+// Mirrors the same function in importpipeline to avoid import cycle.
+func parseSectionLandNumber(addr string) (section, landNumber string) {
+	if addr == "" {
+		return "", ""
+	}
+	m := moiAddressRe.FindStringSubmatch(addr)
+	if m == nil {
+		return "", ""
+	}
+	return m[1], m[3]
+}
+
+// moiAddressRe extracts section and land number from MOI parcel_address.
+// Example: "光華段二小段720-1地號" -> section="光華段二小段", land_number="720-1"
+var moiAddressRe = regexp.MustCompile(`(.+?段(?:(.)小段)?)(\d+(?:-\d+)?)地號`)
+
+// firstDistrictForCounty returns a default district for a given county
+// Used as last resort fallback when district cannot be determined from data
+func firstDistrictForCounty(county string) string {
+	m := map[string]string{
+		"臺北市": "大安區",
+		"新北市": "板橋區",
+		"臺中市": "西屯區",
+		"臺南市": "安平區",
+		"高雄市": "鳳山區",
+		"桃園市": "桃園區",
+		"新竹市": "東區",
+		"新竹縣": "竹北市",
+		"苗栗縣": "苗栗市",
+		"彰化縣": "彰化市",
+		"南投縣": "南投市",
+		"雲林縣": "斗六市",
+		"嘉義市": "東區",
+		"嘉義縣": "太保市",
+		"屏東縣": "屏東市",
+		"宜蘭縣": "宜蘭市",
+		"花蓮縣": "花蓮市",
+		"臺東縣": "臺東市",
+		"澎湖縣": "馬公市",
+		"金門縣": "金城鎮",
+		"連江縣": "南竿鄉",
+		"基隆市": "中正區",
+	}
+	if d, ok := m[county]; ok {
+		return d
+	}
+	return ""
 }
