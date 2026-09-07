@@ -255,12 +255,6 @@ func (n *Normalizer) NormalizeParcel(row map[string]string) (*domain.Parcel, err
 	if district == "" {
 		return nil, fmt.Errorf("missing required field: district")
 	}
-	if section == "" {
-		return nil, fmt.Errorf("missing required field: section")
-	}
-	if landNumber == "" {
-		return nil, fmt.Errorf("missing required field: land_number")
-	}
 
 	area, err := resolveArea(row, []string{"area_sqm", "area", "land_area_sqm"}, []string{"area_ping", "land_area_ping", "area_ping_sqm"})
 	if err != nil {
@@ -305,23 +299,20 @@ func (n *Normalizer) NormalizeParcel(row map[string]string) (*domain.Parcel, err
 	now := time.Now().UTC()
 	p := &domain.Parcel{
 		ID:              uuid.NewString(),
-		County:          county,
-		District:        district,
-		Section:         section,
-		LandNumber:      landNumber,
+		County:          truncate(county, 20),
+		District:        truncate(district, 20),
+		Section:         truncate(section, 50),
+		LandNumber:      truncate(landNumber, 50),
 		AreaSqm:         area,
-		UrbanZoning:     urbanZoning,
-		LandUseCategory: landUseCategory,
-		// Generate valid empty geometry for PostGIS NOT NULL constraint
-		// ST_GeomFromText('MULTIPOLYGON EMPTY') is valid empty geometry
-		// SRID will be enforced by column CHECK constraint (ST_SRID=3826)
-		Geometry:      "MULTIPOLYGON EMPTY",
-		Centroid:      "POINT EMPTY",
-		BBox:          "POLYGON EMPTY",
-		Source:        source,
-		SourceVersion: sourceVersion,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		UrbanZoning:     truncate(urbanZoning, 50),
+		LandUseCategory: truncate(landUseCategory, 50),
+		Geometry:        "MULTIPOLYGON EMPTY",
+		Centroid:        "POINT EMPTY",
+		BBox:            "POLYGON EMPTY",
+		Source:          source,
+		SourceVersion:   sourceVersion,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if v := strings.TrimSpace(row["import_batch_id"]); v != "" {
 		p.ImportBatchID = v
