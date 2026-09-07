@@ -140,6 +140,7 @@ func main() {
 	}
 	if srv.Pool != nil {
 		sched := scheduler.New(srv.Pool, schedCfg, slog.Default())
+		srv.Scheduler = sched
 		sched.Start(ctx)
 		if schedCfg.Enabled {
 			fmt.Fprintf(os.Stderr, "scheduler: enabled (freshness=%dd interval=%s auto_discover=%v)\n", schedCfg.FreshnessDays, schedCfg.RefreshInterval, schedCfg.AutoDiscover)
@@ -149,7 +150,6 @@ func main() {
 	} else {
 		fmt.Fprintf(os.Stderr, "scheduler: skipped (no DB pool)\n")
 	}
-
 	fmt.Fprintf(os.Stderr, "tw-prop-mcp: MCP server starting (transport=%s, addr=%s)\n", transportVal, httpAddr)
 
 	switch transportVal {

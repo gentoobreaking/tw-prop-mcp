@@ -26,8 +26,9 @@ import type {
   ResponseMetadata,
   ProvenanceChain,
   McpError,
+  DataFreshness,
+  TriggerRefreshResult,
 } from '../types';
-
 const RUNTIME_CONFIG = typeof window !== 'undefined'
   ? (window as unknown as { RUNTIME_CONFIG?: { MCP_SERVER_URL?: string } }).RUNTIME_CONFIG
   : undefined;
@@ -389,6 +390,18 @@ export async function getDataSnapshot(snapshotId: string): Promise<Record<string
     snapshot_id: snapshotId,
   });
 }
+// --- Freshness Tools ---
+
+export async function getDataFreshness(): Promise<DataFreshness> {
+  return callMCPTool<DataFreshness>('get_data_freshness', {});
+}
+
+export async function triggerDataRefresh(force?: boolean): Promise<TriggerRefreshResult> {
+  return callMCPTool<TriggerRefreshResult>('trigger_data_refresh', {
+    ...(force !== undefined && { force }),
+  });
+}
+
 
 // --- Combined loader ---
 

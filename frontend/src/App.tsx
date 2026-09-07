@@ -27,6 +27,7 @@ import { ValuationPanel } from './components/ValuationPanel';
 import { ProvenancePanel } from './components/ProvenancePanel';
 import { ErrorState } from './components/ErrorState';
 import ErrorBoundary from './components/ErrorBoundary';
+import { DataFreshnessBar } from './components/DataFreshnessBar';
 import { useAppState } from './hooks/useAppState';
 import { disconnectMCP, explainValuation } from './services/mcpApi';
 import { parcelCentroid } from './services/mapService';
@@ -150,7 +151,6 @@ const App: React.FC = () => {
   };
 
   // Determine overall loading state
-
   return (
     <ErrorBoundary>
       <div className="app-container">
@@ -165,6 +165,11 @@ const App: React.FC = () => {
             )}
           </div>
         </header>
+
+        {/* Data Freshness — 1/11/21 發布，過期顯示 + 手動更新 + 完成後 reload */}
+        <div className="freshness-container">
+          <DataFreshnessBar />
+        </div>
 
         {/* System error banner — SPEC §43 */}
         {systemError && (

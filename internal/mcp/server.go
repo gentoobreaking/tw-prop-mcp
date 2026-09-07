@@ -83,6 +83,10 @@ type Server struct {
 	ParcelRepo    repository.ParcelRepository
 	Pool          *pgxpool.Pool
 	SnapshotRepo  repository.SnapshotRepository
+	Scheduler     interface {
+		IsStale(ctx context.Context) (bool, string)
+		CheckAndRefresh(ctx context.Context) (bool, error)
+	}
 }
 func NewServer(config ServerConfig) *Server {
 	impl := &mcpapi.Implementation{
@@ -137,8 +141,8 @@ func (s *Server) registerTools() {
 	registerComparableTools(s.server, s)
 	registerValuationTools(s.server, s)
 	registerProvenanceTools(s.server, s)
+	registerFreshnessTools(s.server, s)
 }
-
 // registerResources registers MCP resources.
 func (s *Server) registerResources() {
 	registerResources(s.server, s)

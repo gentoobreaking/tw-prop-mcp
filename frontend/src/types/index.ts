@@ -356,6 +356,31 @@ export interface McpError {
   };
 }
 
+/** Data freshness from get_data_freshness */
+export interface DataFreshness {
+  latest_snapshot_id?: string;
+  latest_snapshot_at?: string;
+  latest_import_completed_at?: string;
+  source?: string;
+  source_version?: string;
+  status?: string;
+  record_count?: number;
+  parcel_count: number;
+  transaction_count: number;
+  is_stale: boolean;
+  stale_reason: string;
+  freshness_days: number;
+  next_release_window: string;
+  age_hours?: number;
+}
+
+export interface TriggerRefreshResult {
+  started: boolean;
+  message: string;
+  is_stale: boolean;
+  reason: string;
+}
+
 /** Combined data loaded from MCP for the MapView (legacy compatibility) */
 export interface ViewData {
   parcel?: ParcelGeometry;
