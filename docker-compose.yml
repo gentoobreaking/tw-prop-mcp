@@ -52,6 +52,8 @@ services:
       DATA_REFRESH_INTERVAL: ${DATA_REFRESH_INTERVAL:-6h}
       DATA_IMPORT_URL: ${DATA_IMPORT_URL:-}
       AUTO_DISCOVER: ${AUTO_DISCOVER:-true}
+    ports:
+      - "8080:8080"
     restart: unless-stopped
 
   tw-prop-frontend:
