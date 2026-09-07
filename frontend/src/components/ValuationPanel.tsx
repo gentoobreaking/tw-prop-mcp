@@ -8,8 +8,7 @@
  * Per SPEC §46: no hardcoded valuation values.
  */
 
-import React from 'react';
-import type { ValuationResult, ComparableResult, ResponseMetadata } from '../types';
+import type { ValuationResult, ComparableResult, ResponseMetadata, ValuationExplanation } from '../types';
 import './ValuationPanel.css';
 
 interface ValuationPanelProps {
@@ -19,9 +18,9 @@ interface ValuationPanelProps {
   loading?: boolean;
   error?: string | null;
   onExplain?: (valuationId: string) => void;
+  explanation?: ValuationExplanation | null;
   onViewProvenance?: () => void;
 }
-
 const CONFIDENCE_COLORS: Record<string, string> = {
   HIGH: '#16a34a',
   MEDIUM: '#ca8a04',
@@ -43,6 +42,7 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
   loading = false,
   error,
   onExplain,
+  explanation,
   onViewProvenance,
 }) => {
   if (loading) {
@@ -187,6 +187,19 @@ export const ValuationPanel: React.FC<ValuationPanelProps> = ({
             >
               查看溯源
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Valuation explanation — methodology and outlier handling */}
+      {explanation && (
+        <div className="valuation-explanation">
+          <h4>估價說明</h4>
+          {explanation.methodology && (
+            <p className="explanation-methodology">{explanation.methodology}</p>
+          )}
+          {explanation.explanation && (
+            <p className="explanation-text">{explanation.explanation}</p>
           )}
         </div>
       )}

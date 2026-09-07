@@ -28,9 +28,9 @@ import { ProvenancePanel } from './components/ProvenancePanel';
 import { ErrorState } from './components/ErrorState';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAppState } from './hooks/useAppState';
-import { disconnectMCP } from './services/mcpApi';
+import { disconnectMCP, explainValuation } from './services/mcpApi';
 import { parcelCentroid } from './services/mapService';
-import type { Transaction, ComparableResult } from './types';
+import type { Transaction, ComparableResult, ValuationExplanation } from './types';
 import './App.css';
 
 const MAP_PROVIDER = (typeof window !== 'undefined' &&
@@ -46,6 +46,7 @@ type ActivePanel =
   | 'provenance';
 
 const App: React.FC = () => {
+  const [explanation, setExplanation] = useState<ValuationExplanation | null>(null);
   const {
     // Search
     searchParcels,
@@ -88,6 +89,7 @@ const App: React.FC = () => {
 
     // Valuation
     valuation,
+    valuationExplanation,
     valuationLoading,
     valuationError,
 
@@ -350,7 +352,11 @@ const App: React.FC = () => {
                   }
                   loading={valuationLoading}
                   error={valuationError}
-                  onExplain={() => {}}
+                  onExplain={async (id) => {
+                    const exp = await explainValuation(id, 'detailed');
+                    setExplanation(exp);
+                  }}
+                  explanation={explanation ?? valuationExplanation}
                   onViewProvenance={() => setActivePanel('provenance')}
                 />
               </div>
