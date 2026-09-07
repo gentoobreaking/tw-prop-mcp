@@ -162,8 +162,6 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 			return nil, fmt.Errorf("invalid age %q: negative", s)
 		}
 	}
-
-	// Transaction ID
 	transactionID := strings.TrimSpace(row["transaction_id"])
 	if transactionID == "" {
 		transactionID = strings.TrimSpace(row["serial"])
@@ -171,14 +169,11 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	if transactionID == "" {
 		transactionID = uuid.NewString()
 	}
+	transactionID = truncate(transactionID, 50)
 
 	// Transaction type / target
 	transactionType := strings.TrimSpace(row["transaction_type"])
-	// fallback: if transaction_target indicates
-	transactionTarget := strings.TrimSpace(row["transaction_target"])
-	if transactionType == "" && transactionTarget != "" {
-		// keep as is, no auto-derive
-	}
+	transactionTarget := truncate(strings.TrimSpace(row["transaction_target"]), 50)
 
 	// Source record hash
 	sourceHash := strings.TrimSpace(row["source_record_hash"])
@@ -198,21 +193,21 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 		SnapshotID:        sid,
 		TransactionID:     transactionID,
 		TransactionDate:   tDate,
-		TransactionType:   transactionType,
-		County:            county,
-		District:          district,
-		Section:           section,
-		LandNumber:        landNumber,
+		TransactionType:   truncate(transactionType, 20),
+		County:            truncate(county, 20),
+		District:          truncate(district, 20),
+		Section:           truncate(section, 50),
+		LandNumber:        truncate(landNumber, 50),
 		TransactionTarget: transactionTarget,
 		TotalPrice:        totalPrice,
 		UnitPrice:         unitPrice,
 		LandAreaSqm:       landArea,
 		BuildingAreaSqm:   buildingArea,
-		UrbanZoning:       urbanZoning,
-		NonUrbanZoning:    nonUrbanZoning,
-		LandUseCategory:   landUseCategory,
-		BuildingType:      buildingType,
-		Floor:             floor,
+		UrbanZoning:       truncate(urbanZoning, 50),
+		NonUrbanZoning:    truncate(nonUrbanZoning, 50),
+		LandUseCategory:   truncate(landUseCategory, 50),
+		BuildingType:      truncate(buildingType, 50),
+		Floor:             truncate(floor, 20),
 		Age:               age,
 		ParkingAreaSqm:    parkingArea,
 		ParkingPrice:      parkingPrice,
@@ -224,6 +219,16 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 		tx.ImportBatchID = v
 	}
 	return tx, nil
+}
+
+// truncate returns s truncated to at most n bytes. It is safe for UTF-8
+// strings because it only counts bytes, and the DB column limit is on bytes
+// for VARCHAR semantics in PostgreSQL (character varying).
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
 
 // NormalizeParcel converts a raw row to Parcel.

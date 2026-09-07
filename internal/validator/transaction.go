@@ -14,10 +14,11 @@ import (
 //
 // Validation rules (see DATA_MODEL.md "transaction" table, point 3 of T007):
 //
-//   - (a) Required fields: county, district, section, land_number,
-//     transaction_id, transaction_date (non-zero), and source_record_hash
-//     (non-empty). Uniqueness of source_record_hash is enforced by the
-//     repository UNIQUE(snapshot_id, source_record_hash) constraint, not here.
+//   - (a) Required fields: county, district, transaction_id,
+//     transaction_date (non-zero), and source_record_hash (non-empty).
+//     section and land_number are OPTIONAL (nullable in DB; building-only
+//     transactions have no section/land_number). Uniqueness of source_record_hash
+//     is enforced by the repository UNIQUE(snapshot_id, source_record_hash) constraint, not here.
 //   - (b) Numeric ranges: total_price > 0, land_area_sqm > 0,
 //     building_area_sqm >= 0, parking_area_sqm >= 0, parking_price >= 0,
 //     age >= 0.
@@ -37,8 +38,6 @@ func (v *Validator) ValidateTransaction(tx *domain.Transaction) []ValidationIssu
 	// (a) Required fields.
 	appendRequired(&issues, "county", tx.County)
 	appendRequired(&issues, "district", tx.District)
-	appendRequired(&issues, "section", tx.Section)
-	appendRequired(&issues, "land_number", tx.LandNumber)
 	appendRequired(&issues, "transaction_id", tx.TransactionID)
 	appendRequired(&issues, "source_record_hash", tx.SourceRecordHash)
 	if tx.TransactionDate.IsZero() {

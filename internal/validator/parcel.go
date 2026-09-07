@@ -10,11 +10,10 @@ import (
 // It checks required fields, area range, and (in full mode) performs a
 // lightweight WKT pre-check on the geometry. Issues are returned in field
 // order; blocking (error-level) issues indicate the record must not be
-// imported.
-//
 // Validation rules (see DATA_MODEL.md "parcel" table, point 4 of T007):
 //
-//   - (a) Required fields: county, district, section, land_number.
+//   - (a) Required fields: county, district.
+//     section and land_number are optional (nullable in DB).
 //   - (b) Numeric range: area_sqm > 0.
 //   - (c) urban_zoning / land_use_category are optional (supplied by GIS
 //     import); they are not flagged when empty.
@@ -32,13 +31,10 @@ func (v *Validator) ValidateParcel(p *domain.Parcel) []ValidationIssue {
 		return issues
 	}
 
-	// (a) Required fields. Per DATA_MODEL.md these four form the parcel identity;
-	// land_number must be validated alongside the others (not in isolation).
+	// (a) Required fields. Per DATA_MODEL.md, county and district are required;
+	// section and land_number are optional (nullable in DB).
 	appendRequired(&issues, "county", p.County)
 	appendRequired(&issues, "district", p.District)
-	appendRequired(&issues, "section", p.Section)
-	appendRequired(&issues, "land_number", p.LandNumber)
-
 	// (b) Area.
 	appendPositiveFloat64(&issues, "area_sqm", p.AreaSqm)
 
