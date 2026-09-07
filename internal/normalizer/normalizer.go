@@ -72,10 +72,7 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	if district == "" {
 		return nil, fmt.Errorf("missing required field: district")
 	}
-	// section is optional (nullable in DB, building transactions have no section)
-	if landNumber == "" {
-		return nil, fmt.Errorf("missing required field: land_number")
-	}
+	// section and land_number are optional (nullable in DB)
 
 	// Transaction date
 	dateRaw := strings.TrimSpace(row["transaction_date"])
