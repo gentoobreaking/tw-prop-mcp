@@ -81,8 +81,9 @@ type Server struct {
 	snapshotID    string
 	TxRepo        repository.TransactionRepository
 	ParcelRepo    repository.ParcelRepository
+	Pool          *pgxpool.Pool
+	SnapshotRepo  repository.SnapshotRepository
 }
-
 func NewServer(config ServerConfig) *Server {
 	impl := &mcpapi.Implementation{
 		Name:    config.Name,
@@ -110,15 +111,16 @@ func NewServer(config ServerConfig) *Server {
 			if poolCfg.MaxConns < 20 {
 				poolCfg.MaxConns = 20
 			}
-			poolCfg.MinConns = 2
 			pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "tw-prop-mcp: failed to open database: %v\n", err)
 			} else if err := pool.Ping(ctx); err != nil {
 				fmt.Fprintf(os.Stderr, "tw-prop-mcp: database ping failed: %v\n", err)
 			} else {
+				s.Pool = pool
 				s.ParcelRepo = repository.NewParcelRepository(pool)
 				s.TxRepo = repository.NewTransactionRepository(pool)
+				s.SnapshotRepo = repository.NewSnapshotRepository(pool)
 			}
 		}
 	}
@@ -127,7 +129,6 @@ func NewServer(config ServerConfig) *Server {
 	s.registerPrompts()
 	return s
 }
-
 // registerTools registers all MCP tools with provenance injection.
 func (s *Server) registerTools() {
 	registerTransactionTools(s.server, s)

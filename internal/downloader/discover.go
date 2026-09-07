@@ -9,8 +9,15 @@ import (
 	"time"
 )
 
-// MOI landing page URL
-const landingPageURL = "https://plvr.land.moi.gov.tw/"
+// MOI landing page URLs to try (order matters — first success wins).
+// The site is JS-heavy and the CSV link may be on different pages
+// depending on deployment. We try the landing page plus known download pages.
+var landingPageURLs = []string{
+	"https://plvr.land.moi.gov.tw/",
+	"https://plvr.land.moi.gov.tw/Index",
+	"https://plvr.land.moi.gov.tw/Download",
+	"https://plvr.land.moi.gov.tw/DownloadHistory",
+}
 
 // downloadURLRegex matches the CSV download link pattern on the landing page
 var downloadURLRegex = regexp.MustCompile(`GetFile\?type=csv&id=([0-9A-Z]+)`)
@@ -19,40 +26,41 @@ var downloadURLRegex = regexp.MustCompile(`GetFile\?type=csv&id=([0-9A-Z]+)`)
 // CSV download URL. This URL contains a dynamically rotated file ID that
 // changes whenever MOI publishes new data.
 //
-// Usage:
-//
-//	url, err := AutoDiscoverLatestURL(ctx)
-//	if err != nil { ... }
-//	// url = "https://plvr.land.moi.gov.tw/Download/GetFile?type=csv&id=XXXX..."
+// It tries multiple landing page URLs to handle JS rendering and site moves,
+// and handles weekend/holiday delay by returning whatever latest ID is available
+// — the scheduler's 6h retry will catch delayed publishes.
 func AutoDiscoverLatestURL(ctx context.Context) (string, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, landingPageURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+	var lastErr error
+	for _, u := range landingPageURLs {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			lastErr = fmt.Errorf("create request %s: %w", u, err)
+			continue
+		}
+		req.Header.Set("User-Agent", "tw-prop-mcp-import/2.0")
+		req.Header.Set("Accept", "text/html,application/xhtml+xml")
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("fetch %s: %w", u, err)
+			continue
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("read %s: %w", u, err)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("%s returned status %d", u, resp.StatusCode)
+			continue
+		}
+		matches := downloadURLRegex.FindStringSubmatch(string(body))
+		if len(matches) >= 2 {
+			fileID := matches[1]
+			return fmt.Sprintf("https://plvr.land.moi.gov.tw/Download/GetFile?type=csv&id=%s", fileID), nil
+		}
+		lastErr = fmt.Errorf("no CSV download link found on %s", u)
 	}
-	req.Header.Set("User-Agent", "tw-prop-mcp-import/2.0")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("fetch landing page: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("landing page returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20)) // 2MB limit
-	if err != nil {
-		return "", fmt.Errorf("read landing page: %w", err)
-	}
-
-	matches := downloadURLRegex.FindStringSubmatch(string(body))
-	if len(matches) < 2 {
-		return "", fmt.Errorf("no CSV download link found on landing page")
-	}
-
-	fileID := matches[1]
-	return fmt.Sprintf("https://plvr.land.moi.gov.tw/Download/GetFile?type=csv&id=%s", fileID), nil
+	return "", fmt.Errorf("auto-discover failed after %d URLs, last error: %w", len(landingPageURLs), lastErr)
 }

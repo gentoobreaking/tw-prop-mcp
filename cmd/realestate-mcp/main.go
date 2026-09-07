@@ -4,12 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"tw-prop-mcp/internal/downloader"
 	mcp "tw-prop-mcp/internal/mcp"
+	"tw-prop-mcp/internal/scheduler"
 )
 
 func main() {
@@ -97,7 +99,7 @@ func main() {
 	shutdown := mcp.InitTracer(ctx)
 	defer shutdown(ctx)
 
-	// Auto-discover latest data URL from MOI landing page if --auto flag is set
+	// Auto-discover latest data URL from MOI landing page if --auto flag is set (legacy one-shot)
 	resolvedDataURL := *dataURL
 	if resolvedDataURL == "" {
 		resolvedDataURL = os.Getenv("DATA_IMPORT_URL")
@@ -111,7 +113,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "auto-discovered data URL: %s\n", foundURL)
 		}
 	}
-	_ = resolvedDataURL // logged for server-side import tool usage
+	_ = resolvedDataURL
 
 	// Create MCP server
 	srv := mcp.NewServer(mcp.ServerConfig{
@@ -125,6 +127,28 @@ func main() {
 		HTTPAddr:             httpAddr,
 		RequestIDHeader:      "X-Request-ID",
 	})
+
+	// Auto freshness check + scheduled refresh (docker-compose up 自動檢查)
+	schedCfg := scheduler.ConfigFromEnv()
+	// Legacy --auto flag maps to enabled + auto-discover
+	if *autoImport {
+		schedCfg.Enabled = true
+		schedCfg.AutoDiscover = true
+		if resolvedDataURL != "" {
+			schedCfg.DataImportURL = resolvedDataURL
+		}
+	}
+	if srv.Pool != nil {
+		sched := scheduler.New(srv.Pool, schedCfg, slog.Default())
+		sched.Start(ctx)
+		if schedCfg.Enabled {
+			fmt.Fprintf(os.Stderr, "scheduler: enabled (freshness=%dd interval=%s auto_discover=%v)\n", schedCfg.FreshnessDays, schedCfg.RefreshInterval, schedCfg.AutoDiscover)
+		} else {
+			fmt.Fprintf(os.Stderr, "scheduler: disabled\n")
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "scheduler: skipped (no DB pool)\n")
+	}
 
 	fmt.Fprintf(os.Stderr, "tw-prop-mcp: MCP server starting (transport=%s, addr=%s)\n", transportVal, httpAddr)
 

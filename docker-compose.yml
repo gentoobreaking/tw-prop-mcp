@@ -46,8 +46,12 @@ services:
       ALGORITHM_VERSION: comparable-v2.0
       CONFIGURATION_VERSION: v2.0
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    ports:
-      - "8080:8080"
+      # Auto freshness check + scheduled refresh (Boss: 1/11/21 發布，週末順延 3 天窗口，6h 檢查避免單次錯過)
+      AUTO_REFRESH_ENABLED: ${AUTO_REFRESH_ENABLED:-true}
+      DATA_FRESHNESS_DAYS: ${DATA_FRESHNESS_DAYS:-10}
+      DATA_REFRESH_INTERVAL: ${DATA_REFRESH_INTERVAL:-6h}
+      DATA_IMPORT_URL: ${DATA_IMPORT_URL:-}
+      AUTO_DISCOVER: ${AUTO_DISCOVER:-true}
     restart: unless-stopped
 
   tw-prop-frontend:
