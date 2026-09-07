@@ -313,7 +313,7 @@ const App: React.FC = () => {
                   selectedTransaction={selectedTransaction}
                   onSelect={(tx) => {
                     selectTransaction(tx);
-                    loadTransaction(tx.transaction_id);
+                    loadTransaction(tx.id);
                   }}
                 />
               </div>

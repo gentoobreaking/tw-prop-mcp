@@ -102,7 +102,7 @@ export interface ParcelGeometry {
  *  Maps to service.TransactionData.
  */
 export interface Transaction {
-  transaction_id: string;
+  price_per_ping?: number;
   snapshot_id: string;
   transaction_date: string; // ISO date
   transaction_type: string;
