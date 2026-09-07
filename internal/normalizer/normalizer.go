@@ -26,7 +26,7 @@ type Normalizer struct{}
 func New() *Normalizer { return &Normalizer{} }
 
 // NormalizeTransaction converts a raw row to Transaction.
-// snapshotID is assigned to SnapshotID. Four-key (county+district+section+land_number) is required.
+// snapshotID is assigned to SnapshotID. county+district+land_number required; section optional.
 func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID string) (*domain.Transaction, error) {
 	if row == nil {
 		return nil, fmt.Errorf("nil row")
@@ -37,11 +37,22 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	section := strings.TrimSpace(row["section"])
 	landNumber := strings.TrimSpace(row["land_number"])
 
-	// If district is missing, try to extract from parcel_address
+	// If section is missing, try to extract from parcel_address
+	if section == "" {
+		if addr := strings.TrimSpace(row["parcel_address"]); addr != "" {
+			if sec, _ := parseSectionLandNumber(addr); sec != "" {
+				section = sec
+			}
+		}
+	}
+	// If district is missing, try to extract from parcel_address or section
 	if district == "" {
 		if addr := strings.TrimSpace(row["parcel_address"]); addr != "" {
 			if sec, _ := parseSectionLandNumber(addr); sec != "" {
-				district = sec
+				// section might be "丁台二段" -> district is "丁台二"
+				if idx := strings.Index(sec, "段"); idx > 0 {
+					district = sec[:idx]
+				}
 			}
 		}
 		// If still empty, try to extract from section (first part before 段)
@@ -61,9 +72,7 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	if district == "" {
 		return nil, fmt.Errorf("missing required field: district")
 	}
-	if section == "" {
-		return nil, fmt.Errorf("missing required field: section")
-	}
+	// section is optional (nullable in DB, building transactions have no section)
 	if landNumber == "" {
 		return nil, fmt.Errorf("missing required field: land_number")
 	}
