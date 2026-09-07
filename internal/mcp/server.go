@@ -145,7 +145,13 @@ func (s *Server) RunHTTP(ctx context.Context) error {
 
 	handler := mcpapi.NewStreamableHTTPHandler(func(r *http.Request) *mcpapi.Server {
 		return s.server
-	}, &mcpapi.StreamableHTTPOptions{})
+	}, &mcpapi.StreamableHTTPOptions{
+		// SessionTimeout: auto-close idle SSE sessions after 10 minutes of inactivity.
+		// Without this, disconnected browser sessions accumulate (the browser
+		// loses the session ID on hard refresh) and exhaust server connections,
+		// causing subsequent MCP requests to hang (search stuck on "搜尋中…").
+		SessionTimeout: 10 * time.Minute,
+	})
 
 	mux.Handle("/mcp", s.requestIDMiddleware(handler))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -167,8 +173,12 @@ func (s *Server) RunHTTP(ctx context.Context) error {
 	}
 
 	httpSrv := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 30 * time.Second,
+		ReadTimeout:       120 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	return httpSrv.ListenAndServe()
