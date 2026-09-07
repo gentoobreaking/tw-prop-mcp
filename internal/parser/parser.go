@@ -281,6 +281,7 @@ func validateDate(y, m, d int, orig string) (time.Time, error) {
 }
 
 // ParsePrice parses a price string removing commas and whitespace.
+// Returns error if price <= 0.
 func ParsePrice(s string) (int64, error) {
 	cleaned := strings.ReplaceAll(s, ",", "")
 	cleaned = strings.ReplaceAll(cleaned, "\u3000", "")
@@ -298,11 +299,17 @@ func ParsePrice(s string) (int64, error) {
 		if err != nil {
 			return 0, fmt.Errorf("invalid price %q: %w", s, err)
 		}
+		if f <= 0 {
+			return 0, fmt.Errorf("price must be > 0, got %f", f)
+		}
 		return int64(f), nil
 	}
 	v, err := strconv.ParseInt(cleaned, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid price %q: %w", s, err)
+	}
+	if v <= 0 {
+		return 0, fmt.Errorf("price must be > 0, got %d", v)
 	}
 	return v, nil
 }

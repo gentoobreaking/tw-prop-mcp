@@ -96,12 +96,23 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	if err != nil {
 		return nil, fmt.Errorf("invalid parking_area: %w", err)
 	}
-
+	// Parking price can be 0 (no parking), validate only if present
+	parkingPriceRaw := strings.TrimSpace(row["parking_price"])
+	parkingPrice := int64(0)
+	if parkingPriceRaw != "" && parkingPriceRaw != "0" {
+		pp, err := parser.ParsePrice(parkingPriceRaw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid parking_price %q: %w", parkingPriceRaw, err)
+		}
+		if pp < 0 {
+			return nil, fmt.Errorf("parking_price must be >= 0, got %d", pp)
+		}
+		parkingPrice = pp
+	}
 	// Zoning normalization
 	urbanZoning := normalizeUrbanZoning(strings.TrimSpace(row["urban_zoning"]))
 	nonUrbanZoning := strings.TrimSpace(row["non_urban_zoning"])
 	landUseCategory := normalizeLandUseCategory(strings.TrimSpace(row["land_use_category"]))
-
 	// Building info
 	buildingType := normalizeBuildingType(strings.TrimSpace(row["building_type"]))
 	floor := strings.TrimSpace(row["floor"])
@@ -125,15 +136,6 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 		if age < 0 {
 			return nil, fmt.Errorf("invalid age %q: negative", s)
 		}
-	}
-
-	parkingPrice := int64(0)
-	if s := strings.TrimSpace(row["parking_price"]); s != "" {
-		v, err := parser.ParsePrice(s)
-		if err != nil {
-			return nil, fmt.Errorf("invalid parking_price %q: %w", s, err)
-		}
-		parkingPrice = v
 	}
 
 	// Transaction ID
