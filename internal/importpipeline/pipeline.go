@@ -396,6 +396,16 @@ var moiAddressRe = regexp.MustCompile(`(.+?段(?:(.)小段)?)(\d+(?:-\d+)?)地�
 // parseSectionLandNumber extracts section and land_number from the MOI
 // "土地位置建物門牌" (parcel_address) field.
 func parseSectionLandNumber(addr string) (section, landNumber string) {
+	if addr == "" {
+		return "", ""
+	}
+	m := moiAddressRe.FindStringSubmatch(addr)
+	if m == nil {
+		return "", ""
+	}
+	return m[1], m[3]
+}
+
 // countyFromFilename derives county name from MOI filename prefix.
 // Mapping is based on the official MOI real-price registration data manifest.
 var moiCountyMap = map[string]string{
@@ -413,14 +423,6 @@ func countyFromFilename(name string) string {
 		base = base[:dot]
 	}
 	if len(base) > 0 {
-		prefix := string(base[0])
-		if county, ok := moiCountyMap[strings.ToLower(prefix)]; ok {
-			return county
-		}
-	}
-	return ""
-}
-
 // enrichRows augments parsed rows with county (from config or filename) and
 // parses parcel_address to extract section and land_number.
 func (p *ImportPipeline) enrichRows(rows []map[string]string) []map[string]string {
@@ -428,7 +430,8 @@ func (p *ImportPipeline) enrichRows(rows []map[string]string) []map[string]strin
 	if county == "" {
 		county = countyFromFilename(filepath.Base(p.Config.DownloadURL))
 	}
-	for _, row := range rows {
+	for i := range rows {
+		row := rows[i]
 		if county != "" && row["county"] == "" {
 			row["county"] = county
 		}
@@ -441,6 +444,7 @@ func (p *ImportPipeline) enrichRows(rows []map[string]string) []map[string]strin
 				row["land_number"] = landNumber
 			}
 		}
+		rows[i] = row
 	}
 	p.Logger.Info("enrichment completed", "rows", len(rows), "county", county)
 	return rows
