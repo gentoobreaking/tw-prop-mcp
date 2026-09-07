@@ -403,7 +403,7 @@ export function useAppState() {
           ...s,
           searchLoading: false,
           searchError:
-            'Search requires at least county and district. Try: "臺北市 中正區 八德段 001-002-003"',
+            '請提供至少縣市和鄉鎮，例如: "澎湖縣 馬公市" 或 "臺北市 中正區"',
         }));
         return;
       }

@@ -103,7 +103,7 @@ export const ParcelInspector: React.FC<ParcelInspectorProps> = ({
       <aside className="parcel-inspector">
         <div className="parcel-empty">
           <p>請搜尋地號以查看詳細資訊</p>
-          <p className="parcel-empty-hint">例: 臺北市 中正區 八德段 001-002-003</p>
+          <p className="parcel-empty-hint">請搜尋完整地址，例如: "澎湖縣 西嶼鄉" 或 "臺北市 中正區"</p>
         </div>
       </aside>
     );

@@ -217,7 +217,7 @@ const App: React.FC = () => {
             {/* Empty search — always show when no results and not loading, not an error */}
             {!searchLoading && searchResults.length === 0 && searchQuery && !searchError && !searchErrorMcp && (
               <div className="sidebar-section">
-                <div className="search-empty-msg">查無「{searchQuery}」地號，此庫僅 1 筆 sample（臺北市 中正區 八德段）。請先按上方「匯入 ZIP」上傳 lvr_landcsv.zip 或試「臺北市 中正區」</div>
+<div className="search-empty-msg">查無「{searchQuery}」地號。請嘗試: <strong>澎湖縣 馬公市</strong> 或 <strong>臺北市 中正區</strong></div>
               </div>
             )}
 

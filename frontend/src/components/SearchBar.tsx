@@ -20,7 +20,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   loading,
   error,
-  placeholder = '搜尋地號 (例: 臺北市 中正區 八德段 001-002-003)',
+  placeholder = '搜尋地號 (例: 澎湖縣 西嶼鄉 或 臺北市 中正區)',
 }) => {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
