@@ -300,10 +300,10 @@ func (n *Normalizer) NormalizeParcel(row map[string]string) (*domain.Parcel, err
 		Geometry:      "MULTIPOLYGON EMPTY",
 		Centroid:      "POINT EMPTY",
 		BBox:          "POLYGON EMPTY",
-		Source:          source,
-		SourceVersion:   sourceVersion,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		Source:        source,
+		SourceVersion: sourceVersion,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if v := strings.TrimSpace(row["import_batch_id"]); v != "" {
 		p.ImportBatchID = v
@@ -411,7 +411,7 @@ func normalizeLandUseCategory(s string) string {
 		return ""
 	}
 	m := map[string]string{
-		"住": "住宅區",
+		"住":  "住宅區",
 		"甲建": "甲種建築用地",
 		"乙建": "乙種建築用地",
 		"丙建": "丙種建築用地",

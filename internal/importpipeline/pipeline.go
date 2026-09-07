@@ -254,6 +254,7 @@ func (p *ImportPipeline) initSnapshot(ctx context.Context) error {
 	})
 	return err
 }
+
 // download downloads the source file.
 func (p *ImportPipeline) download(ctx context.Context) (string, error) {
 	dest := p.Config.DownloadDest
@@ -390,6 +391,7 @@ func (p *ImportPipeline) parseZip(ctx context.Context, zipPath string) ([]map[st
 	p.Logger.Info("zip parsing completed", "total_rows", len(allRows))
 	return allRows, nil
 }
+
 // Example: "光華段二小段720-1地號" -> section="光華段二小段", land_number="720-1"
 var moiAddressRe = regexp.MustCompile(`(.+?段(?:(.)小段)?)(\d+(?:-\d+)?)地號`)
 
@@ -422,7 +424,19 @@ func countyFromFilename(name string) string {
 	if dot := strings.LastIndex(base, "."); dot > 0 {
 		base = base[:dot]
 	}
-	if len(base) > 0 {
+	if len(base) > 0 && len(base) >= 2 {
+		prefix := base[:2]
+		if county, ok := moiCountyMap[strings.ToLower(prefix)]; ok {
+			return county
+		}
+		prefix = string(base[0])
+		if county, ok := moiCountyMap[strings.ToLower(prefix)]; ok {
+			return county
+		}
+	}
+	return ""
+}
+
 // enrichRows augments parsed rows with county (from config or filename) and
 // parses parcel_address to extract section and land_number.
 func (p *ImportPipeline) enrichRows(rows []map[string]string) []map[string]string {
@@ -532,6 +546,7 @@ func (p *ImportPipeline) deduplicate(transactions []domain.Transaction, parcels 
 	p.Logger.Info("deduplication completed", "transactions", len(dedupedTxns), "parcels", len(dedupedParcels))
 	return dedupedTxns, dedupedParcels
 }
+
 // importData inserts data into the database within a single transaction.
 // Spec §62: BEGIN → load → validate → reconcile → COMMIT → LOCK.
 // If any step fails, ROLLBACK ensures no partial data remains.
