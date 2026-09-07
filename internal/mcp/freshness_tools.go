@@ -167,11 +167,15 @@ func triggerDataRefreshHandler(s *Server) func(ctx context.Context, req *mcpapi.
 			}, nil
 		}
 		// Run in background with timeout
-		go func() {
+		go func(force bool) {
 			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 			defer cancel()
-			_, _ = s.Scheduler.CheckAndRefresh(bgCtx)
-		}()
+			if force {
+				_, _ = s.Scheduler.ForceRefresh(bgCtx)
+			} else {
+				_, _ = s.Scheduler.CheckAndRefresh(bgCtx)
+			}
+		}(force)
 		return nil, triggerDataRefreshOutput{
 			Started: true,
 			Message: "refresh started in background; poll get_import_progress for completion",

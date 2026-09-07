@@ -90,6 +90,7 @@ type Server struct {
 		CheckAndRefresh(ctx context.Context) (bool, error)
 		GetProgress() any
 		ImportLocalZip(ctx context.Context, zipPath string) (bool, error)
+		ForceRefresh(ctx context.Context) (bool, error)
 	}
 }
 func NewServer(config ServerConfig) *Server {

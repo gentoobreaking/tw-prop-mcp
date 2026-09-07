@@ -527,24 +527,52 @@ func (r *parcelRepository) BatchInsert(ctx context.Context, parcels []domain.Par
 	return total, nil
 }
 
-// batchInsertParcels inserts a single batch of parcels using COPY FROM.
+// batchInsertParcels inserts a single batch of parcels using individual INSERT statements
+// to properly handle PostGIS geometry with EWKT format.
+// Uses ON CONFLICT DO NOTHING to handle duplicate parcels gracefully.
 func (r *parcelRepository) batchInsertParcels(ctx context.Context, parcels []domain.Parcel) (int64, error) {
-	count, err := r.db.CopyFrom(
-		ctx,
-		pgx.Identifier{"parcel"},
-		[]string{"county", "district", "section", "land_number", "area_sqm", "urban_zoning", "land_use_category", "geometry", "centroid", "bbox", "source", "source_version", "import_batch_id"},
-		pgx.CopyFromSlice(len(parcels), func(i int) ([]any, error) {
-			p := parcels[i]
-			return []any{
-				p.County, p.District, p.Section, p.LandNumber, p.AreaSqm,
-				p.UrbanZoning, p.LandUseCategory, p.Geometry, p.Centroid, p.BBox,
-				p.Source, p.SourceVersion, p.ImportBatchID,
-			}, nil
-		}),
-	)
-	return count, err
-}
+	if len(parcels) == 0 {
+		return 0, nil
+	}
 
+	var total int64
+	for _, p := range parcels {
+		// Use EWKT format for geometry: SRID=3826;MULTIPOLYGON EMPTY
+		// This ensures the geometry has the correct SRID for the column CHECK constraint.
+		geometryWKT := p.Geometry
+		centroidWKT := p.Centroid
+		bboxWKT := p.BBox
+		if geometryWKT == "" {
+			geometryWKT = "MULTIPOLYGON EMPTY"
+		}
+		if centroidWKT == "" {
+			centroidWKT = "POINT EMPTY"
+		}
+		if bboxWKT == "" {
+			bboxWKT = "POLYGON EMPTY"
+		}
+		// Use EWKT format with explicit SRID=3826
+		geom := fmt.Sprintf("SRID=3826;%s", geometryWKT)
+		centroid := fmt.Sprintf("SRID=3826;%s", centroidWKT)
+		bbox := fmt.Sprintf("SRID=3826;%s", bboxWKT)
+
+		_, err := r.db.Exec(ctx,
+			`INSERT INTO parcel (county, district, section, land_number, area_sqm, urban_zoning, land_use_category, geometry, centroid, bbox, source, source_version, import_batch_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, ST_GeomFromEWKT($8), ST_GeomFromEWKT($9), ST_GeomFromEWKT($10), $11, $12, $13)
+			ON CONFLICT (county, district, section, land_number, source, source_version) DO NOTHING`,
+			p.County, p.District, p.Section, p.LandNumber, p.AreaSqm,
+			p.UrbanZoning, p.LandUseCategory,
+			geom, centroid, bbox,
+			p.Source, p.SourceVersion, p.ImportBatchID,
+		)
+		if err != nil {
+			return total, fmt.Errorf("insert parcel: %w", err)
+		}
+		total++
+	}
+
+	return total, nil
+}
 func (r *parcelRepository) fetch4326ByLandNumber(ctx context.Context, county, district, section, landNumber string) (string, string, string, error) {
 	query := `SELECT ST_AsText(ST_Transform(geometry,4326)), ST_AsText(ST_Transform(centroid,4326)), ST_AsText(ST_Transform(bbox,4326)) FROM parcel WHERE county=$1 AND district=$2 AND section=$3 AND land_number=$4`
 	var geom, centroid, bbox *string

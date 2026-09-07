@@ -273,8 +273,12 @@ func (n *Normalizer) NormalizeParcel(row map[string]string) (*domain.Parcel, err
 		AreaSqm:         area,
 		UrbanZoning:     urbanZoning,
 		LandUseCategory: landUseCategory,
-		Geometry:        "", // to be filled by GIS import
-		Centroid:        "",
+		// Generate valid empty geometry for PostGIS NOT NULL constraint
+		// ST_GeomFromText('MULTIPOLYGON EMPTY') is valid empty geometry
+		// SRID will be enforced by column CHECK constraint (ST_SRID=3826)
+		Geometry:      "MULTIPOLYGON EMPTY",
+		Centroid:      "POINT EMPTY",
+		BBox:          "POLYGON EMPTY",
 		Source:          source,
 		SourceVersion:   sourceVersion,
 		CreatedAt:       now,
@@ -288,6 +292,9 @@ func (n *Normalizer) NormalizeParcel(row map[string]string) (*domain.Parcel, err
 	}
 	if v := strings.TrimSpace(row["centroid"]); v != "" {
 		p.Centroid = v
+	}
+	if v := strings.TrimSpace(row["bbox"]); v != "" {
+		p.BBox = v
 	}
 	return p, nil
 }

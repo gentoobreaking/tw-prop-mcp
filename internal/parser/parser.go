@@ -135,6 +135,10 @@ func (p *Parser) ParseCSV(ctx context.Context, r io.Reader) ([]map[string]string
 				m[k] = strings.TrimSpace(record[i])
 			}
 		}
+		// Skip English header row (second line in MOI CSVs: "The villages and towns...")
+		if m["district"] == "The villages and towns urban district" || m["county"] == "The villages and towns urban district" {
+			continue
+		}
 		out = append(out, m)
 	}
 	return out, nil

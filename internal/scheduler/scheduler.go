@@ -257,6 +257,50 @@ func (s *Scheduler) CheckAndRefresh(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
+// ForceRefresh bypasses IsStale and always downloads the latest zip
+func (s *Scheduler) ForceRefresh(ctx context.Context) (bool, error) {
+	if !s.config.Enabled {
+		s.logger.Info("force refresh disabled, skipping")
+		return false, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.setProgress(true, "discovering", 10, "強制更新：尋找最新資料")
+	url := s.config.DataImportURL
+	if url == "" && s.config.AutoDiscover {
+		discovered, err := downloader.AutoDiscoverLatestURL(ctx)
+		if err != nil {
+			s.setProgressError(fmt.Sprintf("auto-discover failed: %v", err))
+			return false, err
+		}
+		url = discovered
+	}
+	if url == "" {
+		s.setProgressError("no DATA_IMPORT_URL")
+		return false, fmt.Errorf("no DATA_IMPORT_URL")
+	}
+	s.setProgress(true, "downloading", 30, "強制下載中")
+	s.logger.Info("force refresh starting", "url", url)
+	snapshotID := uuid.NewString()
+	pipeline := importpipeline.NewImportPipeline(importpipeline.PipelineConfig{
+		SnapshotID:  snapshotID,
+		DownloadURL: url,
+	}, s.logger)
+	snapshotRepo := repository.NewSnapshotRepository(s.pool)
+	txRepo := repository.NewTransactionRepository(s.pool)
+	parcelRepo := repository.NewParcelRepository(s.pool)
+	pipeline.SetRepositories(txRepo, parcelRepo, snapshotRepo)
+	pipeline.SetDB(s.pool)
+	s.setProgress(true, "importing", 50, "強制匯入中")
+	result, err := pipeline.ImportFromSource(ctx)
+	if err != nil {
+		s.setProgressError(fmt.Sprintf("force import failed: %v", err))
+		return false, err
+	}
+	s.setProgress(false, "done", 100, fmt.Sprintf("強制完成：%d 筆交易、%d 筆地號", result.TransactionsImported, result.ParcelsImported))
+	return true, nil
+}
+
 // ImportLocalZip imports a local lvr_landcsv.zip file (manual upload).
 func (s *Scheduler) ImportLocalZip(ctx context.Context, zipPath string) (bool, error) {
 	if !s.mu.TryLock() {

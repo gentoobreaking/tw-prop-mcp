@@ -345,6 +345,17 @@ func (p *ImportPipeline) parseZip(ctx context.Context, zipPath string) ([]map[st
 		if !strings.HasSuffix(lower, ".csv") {
 			continue
 		}
+		base := strings.ToLower(filepath.Base(f.Name))
+		// Only parse main transaction files: a_lvr_land_a.csv, b_lvr_land_a.csv etc.
+		// Skip subsidiary files: *_build.csv, *_land.csv, *_park.csv, and build_time.xml
+		// Also skip the main file if it's not the primary land transaction file
+		if strings.HasSuffix(base, "_build.csv") || strings.HasSuffix(base, "_land.csv") || strings.HasSuffix(base, "_park.csv") || base == "build_time.xml" {
+			continue
+		}
+		// Only process main land transaction files: *lvr_land_a.csv (not *_build, *_land, *_park)
+		if !strings.HasSuffix(base, "lvr_land_a.csv") {
+			continue
+		}
 		rc, err := f.Open()
 		if err != nil {
 			p.Logger.Warn("zip entry open failed", "file", f.Name, "error", err)
