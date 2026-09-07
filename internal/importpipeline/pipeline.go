@@ -518,11 +518,9 @@ func (p *ImportPipeline) deduplicate(transactions []domain.Transaction, parcels 
 	dedupedParcels := make([]domain.Parcel, 0, len(parcels))
 
 	for _, txn := range transactions {
-		key := txn.SourceRecordHash
-		if key == "" {
-			// Generate hash from key fields if not present
-			key = fmt.Sprintf("%s|%s|%s|%s|%s", txn.County, txn.District, txn.Section, txn.LandNumber, txn.TransactionDate.Format("2006-01-02"))
-		}
+		// Use transaction_id (from CSV 編號/serial) + county/district/section/land_number as key
+		// This matches the unique constraint: (county, district, section, land_number, snapshot_id, transaction_id)
+		key := fmt.Sprintf("%s|%s|%s|%s|%s", txn.County, txn.District, txn.Section, txn.LandNumber, txn.TransactionID)
 		if !seenTxns[key] {
 			seenTxns[key] = true
 			dedupedTxns = append(dedupedTxns, txn)
@@ -540,7 +538,6 @@ func (p *ImportPipeline) deduplicate(transactions []domain.Transaction, parcels 
 	p.Logger.Info("deduplication completed", "transactions", len(dedupedTxns), "parcels", len(dedupedParcels))
 	return dedupedTxns, dedupedParcels
 }
-
 // importData inserts data into the database within a single transaction.
 // Spec §62: BEGIN → load → validate → reconcile → COMMIT → LOCK.
 // If any step fails, ROLLBACK ensures no partial data remains.
