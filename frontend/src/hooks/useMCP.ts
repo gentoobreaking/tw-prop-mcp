@@ -25,22 +25,7 @@ export function useMCP(): {
     ? {
         parcel: appState.selectedParcel,
         transactions: appState.transactions,
-        roads: appState.roadAccess
-          ? [
-              {
-                road_id: '',
-                name: '',
-                width_source: appState.roadAccess.source ?? 'unknown',
-                geometry: { type: 'MultiLineString', coordinates: [] },
-                distance_m: appState.roadAccess.distance_m,
-                access_type: (appState.roadAccess.status as
-                  | 'ROAD_ADJACENT'
-                  | 'ROAD_NEARBY'
-                  | 'NO_ROAD_DETECTED'
-                  | 'UNKNOWN') ?? 'UNKNOWN',
-              },
-            ]
-          : [],
+        roads: appState.nearbyRoads,
         comparables: appState.comparables,
         valuation: appState.valuation ?? undefined,
         map_context: appState.mapContext ?? undefined,
