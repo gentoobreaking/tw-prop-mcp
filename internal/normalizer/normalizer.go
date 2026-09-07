@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -144,19 +145,14 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	floor := strings.TrimSpace(row["floor"])
 	age := 0
 	if s := strings.TrimSpace(row["age"]); s != "" {
-		parsed, err := parser.ParsePrice(s) // reuse integer parsing
-		if err != nil {
-			// try generic int parse after cleaning
-			cleaned := strings.ReplaceAll(s, ",", "")
-			cleaned = strings.TrimSpace(cleaned)
-			// remove 年 suffix
-			cleaned = strings.TrimSuffix(cleaned, "年")
-			cleaned = strings.TrimSpace(cleaned)
-			var pErr error
-			parsed, pErr = parser.ParsePrice(cleaned)
-			if pErr != nil {
-				return nil, fmt.Errorf("invalid age %q: %w", s, pErr)
-			}
+		cleaned := strings.ReplaceAll(s, "，", "")
+		cleaned = strings.ReplaceAll(cleaned, ",", "")
+		cleaned = strings.TrimSpace(cleaned)
+		cleaned = strings.TrimSuffix(cleaned, "年")
+		cleaned = strings.TrimSpace(cleaned)
+		parsed, pErr := strconv.ParseInt(cleaned, 10, 64)
+		if pErr != nil {
+			return nil, fmt.Errorf("invalid age %q: %w", s, pErr)
 		}
 		age = int(parsed)
 		if age < 0 {

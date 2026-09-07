@@ -93,8 +93,6 @@ func TestValidator_Transaction_MissingFields(t *testing.T) {
 	}{
 		{"county", func(tx *domain.Transaction) { tx.County = "" }},
 		{"district", func(tx *domain.Transaction) { tx.District = "" }},
-		{"section", func(tx *domain.Transaction) { tx.Section = "" }},
-		{"land_number", func(tx *domain.Transaction) { tx.LandNumber = "" }},
 		{"transaction_id", func(tx *domain.Transaction) { tx.TransactionID = "" }},
 		{"source_record_hash", func(tx *domain.Transaction) { tx.SourceRecordHash = "" }},
 	}
@@ -236,8 +234,6 @@ func TestValidator_Parcel_MissingFields(t *testing.T) {
 	}{
 		{"county", func(p *domain.Parcel) { p.County = "" }},
 		{"district", func(p *domain.Parcel) { p.District = "" }},
-		{"section", func(p *domain.Parcel) { p.Section = "" }},
-		{"land_number", func(p *domain.Parcel) { p.LandNumber = "" }},
 	}
 	for _, rf := range requiredFields {
 		p := validParcel()

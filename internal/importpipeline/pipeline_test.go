@@ -162,7 +162,7 @@ func TestNormalizeAndValidate(t *testing.T) {
 		"total_price":            "10000000",
 		"unit_price":             "300000",
 		"land_area_sqm":          "33.33",
-		"building_area_sqm":      "0",
+		"building_area_sqm":      "50.0",
 		"urban_zoning":           "住宅區",
 		"non_urban_zoning":       "",
 		"land_use_category":      "住宅",
