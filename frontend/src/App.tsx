@@ -57,6 +57,7 @@ const App: React.FC = () => {
     searchErrorMcp,
     searchResults,
     searchTotalCount,
+    searchQuery,
 
     // Parcel
     selectedParcelIdentity,
@@ -210,6 +211,13 @@ const App: React.FC = () => {
             {searchLoading && searchResults.length === 0 && (
               <div className="sidebar-section">
                 <div className="search-loading-msg">搜尋中…</div>
+              </div>
+            )}
+
+            {/* Empty search — always show when no results and not loading, not an error */}
+            {!searchLoading && searchResults.length === 0 && searchQuery && !searchError && !searchErrorMcp && (
+              <div className="sidebar-section">
+                <div className="search-empty-msg">查無「{searchQuery}」地號，此庫僅 1 筆 sample（臺北市 中正區 八德段）。請先按上方「匯入 ZIP」上傳 lvr_landcsv.zip 或試「臺北市 中正區」</div>
               </div>
             )}
 

@@ -64,9 +64,14 @@ export const DataFreshnessBar: React.FC = () => {
 
   useEffect(() => {
     void fetchFreshness();
+    void fetchProgress();
     const id = window.setInterval(() => void fetchFreshness(), 6 * 60 * 60 * 1000);
-    return () => clearInterval(id);
-  }, [fetchFreshness]);
+    const pid = window.setInterval(() => void fetchProgress(), 5000);
+    return () => {
+      clearInterval(id);
+      clearInterval(pid);
+    };
+  }, [fetchFreshness, fetchProgress]);
 
   // Poll progress when refreshing
   useEffect(() => {
@@ -90,7 +95,6 @@ export const DataFreshnessBar: React.FC = () => {
       clearInterval(pollRef.current!);
     };
   }, [refreshing, fetchProgress, fetchFreshness]);
-
   const handleRefresh = async () => {
     setRefreshing(true);
     setLastRefreshMsg(null);
@@ -185,7 +189,8 @@ export const DataFreshnessBar: React.FC = () => {
         </label>
         {data?.is_stale && !refreshing && <span className="freshness-hint">建議更新</span>}
       </div>
-      {refreshing && progress && (
+      {/* 進度條常駐：只要有進度就顯示，錯誤不消失 */}
+      {progress && (progress.running || progress.percent > 0 || progress.error) && (
         <div className="freshness-progress">
           <div className="progress-bar-outer">
             <div className="progress-bar-inner" style={{ width: `${progress.percent}%` }} />
@@ -196,13 +201,14 @@ export const DataFreshnessBar: React.FC = () => {
           {progress.error && <span className="progress-error">{progress.error}</span>}
         </div>
       )}
-      {(error || lastRefreshMsg) && !refreshing && (
+      {/* 錯誤常駐：不因 refreshing 而消失 */}
+      {(error || lastRefreshMsg || progress?.error) && (
         <div className="freshness-msg">
           {error && <span className="error">{error}</span>}
-          {lastRefreshMsg && <span className="info">{lastRefreshMsg}</span>}
+          {progress?.error && <span className="error"> — {progress.error} — 請改用「匯入 ZIP」手動上傳 lvr_landcsv.zip</span>}
+          {lastRefreshMsg && <span className="info"> — {lastRefreshMsg}</span>}
         </div>
       )}
-      {lastRefreshMsg && refreshing && <div className="freshness-msg"><span className="info">{lastRefreshMsg}</span></div>}
     </div>
   );
 };
