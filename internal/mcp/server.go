@@ -101,14 +101,25 @@ func NewServer(config ServerConfig) *Server {
 	// Initialize database repositories if DSN configured
 	if config.DatabaseDSN != "" {
 		ctx := context.Background()
-		pool, err := pgxpool.New(ctx, config.DatabaseDSN)
+		poolCfg, err := pgxpool.ParseConfig(config.DatabaseDSN)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tw-prop-mcp: failed to open database: %v\n", err)
-		} else if err := pool.Ping(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "tw-prop-mcp: database ping failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "tw-prop-mcp: failed to parse database DSN: %v\n", err)
 		} else {
-			s.ParcelRepo = repository.NewParcelRepository(pool)
-			s.TxRepo = repository.NewTransactionRepository(pool)
+			// Default pgxpool MaxConns is 4 — too low for concurrent MCP tool calls
+			// (search + parallel parcel loads can easily exceed 4). Bump to 20.
+			if poolCfg.MaxConns < 20 {
+				poolCfg.MaxConns = 20
+			}
+			poolCfg.MinConns = 2
+			pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "tw-prop-mcp: failed to open database: %v\n", err)
+			} else if err := pool.Ping(ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "tw-prop-mcp: database ping failed: %v\n", err)
+			} else {
+				s.ParcelRepo = repository.NewParcelRepository(pool)
+				s.TxRepo = repository.NewTransactionRepository(pool)
+			}
 		}
 	}
 	s.registerTools()

@@ -33,73 +33,137 @@ const RUNTIME_CONFIG = typeof window !== 'undefined'
   : undefined;
 const MCP_BASE_URL = RUNTIME_CONFIG?.MCP_SERVER_URL ?? import.meta.env.VITE_MCP_SERVER_URL;
 
-// Singleton client + transport
+// Singleton client + transport — MUST reuse to avoid session leak and race on rapid clicks.
+// Boss 回報：連點 3-4 次無反應、第 5 次卡在「搜尋中…」→ root cause 是 getClient() 每次都 new Transport/Client
+// 並覆蓋全域變數，導致並發 connect 時舊的 transport 被 orphan，後續 callTool hang。
 let client: Client | null = null;
 let transport: StreamableHTTPClientTransport | null = null;
-
+let connecting: Promise<Client> | null = null;
 
 async function getClient(): Promise<Client> {
+  if (client && transport) {
+    return client;
+  }
+  if (connecting) {
+    return connecting;
+  }
   if (!MCP_BASE_URL) {
     throw new Error('MCP_SERVER_URL not configured.');
   }
   const baseUrl = new URL(MCP_BASE_URL, typeof window !== 'undefined' ? window.location.origin : undefined);
-  transport = new StreamableHTTPClientTransport(baseUrl);
-  client = new Client({
+  const t = new StreamableHTTPClientTransport(baseUrl);
+  const c = new Client({
     name: 'tw-prop-mcp-frontend',
     version: '2.0.0',
   });
-  await client.connect(transport);
-  return client;
+  connecting = c
+    .connect(t)
+    .then(() => {
+      client = c;
+      transport = t;
+      connecting = null;
+      return c;
+    })
+    .catch((err) => {
+      connecting = null;
+      // Ensure broken transport is discarded
+      try {
+        void c.close();
+      } catch {}
+      throw err;
+    });
+  return connecting;
+}
+
+/**
+ * Force reset singleton — used when a call fails with session/transport error
+ * so the next call can re-establish a fresh session.
+ */
+function resetClient(): void {
+  if (client) {
+    try {
+      void client.close();
+    } catch {}
+  }
+  client = null;
+  transport = null;
+  connecting = null;
 }
 
 /**
  * Calls an MCP tool and returns the parsed result.
  * Throws an Error with a `.mcpError` property if the MCP tool
  * returned an error result.
+ * Includes 30s timeout and auto-reset on session/transport errors.
  */
 export async function callMCPTool<T>(toolName: string, params?: Record<string, unknown>): Promise<T> {
-  const c = await getClient();
-  const result = await c.callTool({
-    name: toolName,
-    arguments: params ?? {},
-  });
+  const doCall = async (): Promise<T> => {
+    const c = await getClient();
+    const result = await c.callTool({
+      name: toolName,
+      arguments: params ?? {},
+    });
 
-  const contents = (result.content ?? []) as Array<Record<string, unknown>>;
+    const contents = (result.content ?? []) as Array<Record<string, unknown>>;
 
-  // Check for MCP error result
-  if (result.isError || contents.length === 0) {
+    // Check for MCP error result
+    if (result.isError || contents.length === 0) {
+      for (const content of contents) {
+        if ('text' in content && typeof content.text === 'string') {
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(content.text);
+          } catch {
+            throw new Error(`MCP tool ${toolName} failed: ${content.text}`);
+          }
+          if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+            const err = parsed as McpError;
+            const e = new Error(err.error.message) as Error & { mcpError: McpError };
+            e.mcpError = err;
+            throw e;
+          }
+        }
+      }
+      throw new Error(`MCP tool ${toolName} returned an error with no content`);
+    }
+
     for (const content of contents) {
       if ('text' in content && typeof content.text === 'string') {
-        let parsed: unknown;
+        const text = content.text;
         try {
-          parsed = JSON.parse(content.text);
+          return JSON.parse(text) as T;
         } catch {
-          throw new Error(`MCP tool ${toolName} failed: ${content.text}`);
-        }
-        if (parsed && typeof parsed === 'object' && 'error' in parsed) {
-          const err = parsed as McpError;
-          const e = new Error(err.error.message) as Error & { mcpError: McpError };
-          e.mcpError = err;
-          throw e;
+          // If not JSON, return the text itself
+          return text as unknown as T;
         }
       }
     }
-    throw new Error(`MCP tool ${toolName} returned an error with no content`);
-  }
 
-  for (const content of contents) {
-    if ('text' in content && typeof content.text === 'string') {
-      const text = content.text;
-      try {
-        return JSON.parse(text) as T;
-      } catch {
-        // If not JSON, return the text itself
-        return text as unknown as T;
-      }
+    return result as unknown as T;
+  };
+
+  // 30s timeout — avoids forever hang (Boss: 5th click stuck on 搜尋中…)
+  const withTimeout = <U>(p: Promise<U>, ms = 30000): Promise<U> =>
+    Promise.race([
+      p,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`MCP tool ${toolName} timed out after ${ms}ms`)), ms)),
+    ]);
+
+  try {
+    return await withTimeout(doCall());
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isSessionError =
+      msg.includes('Session') ||
+      msg.includes('session') ||
+      msg.includes('transport') ||
+      msg.includes('Not connected') ||
+      msg.includes('timed out');
+    if (isSessionError) {
+      resetClient();
     }
+    throw err;
   }
-
-  return result as unknown as T;
 }
 
 /**
@@ -430,8 +494,12 @@ export async function loadParcelView(params: LoadParcelViewParams): Promise<{
 // Disconnect when page unloads
 export function disconnectMCP(): void {
   if (client) {
-    void client.close();
-    client = null;
-    transport = null;
+    try {
+      void client.close();
+    } catch {}
   }
+  client = null;
+  transport = null;
+  connecting = null;
 }
+

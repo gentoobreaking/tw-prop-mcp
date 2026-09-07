@@ -262,12 +262,13 @@ export function useAppState() {
 
   // Track whether initial connection check has happened
   const connectionCheckedRef = useRef(false);
+  // Sequence for search — ignore stale responses when user clicks rapidly (Boss: 3-4 clicks no response)
+  const searchSeqRef = useRef(0);
   // Ref for loadParcelDependentData to break circular dependency in useCallback
   const loadDependentDataRef = useRef<(
     parcelId: string,
     identity: ParcelIdentity,
   ) => Promise<void>>(async () => {});
-
   // --- Connection status check ---
   useEffect(() => {
     if (connectionCheckedRef.current) return;
@@ -304,11 +305,15 @@ export function useAppState() {
       } catch (err) {
         lastError = err;
         const mcpErr = mcpApi.extractMcpError(err);
-        // Don't retry non-retryable errors (INVALID_ARGUMENT, PARCEL_NOT_FOUND, etc.)
-        const isNonRetryable = mcpErr && !mcpErr.error.retryable && [
-          'INVALID_ARGUMENT', 'PARCEL_NOT_FOUND', 'TRANSACTION_NOT_FOUND',
-          'SNAPSHOT_NOT_FOUND', 'SOURCE_UNAVAILABLE',
-        ].includes(mcpErr.error.code);
+        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = msg.includes('timed out');
+        // Don't retry non-retryable errors (INVALID_ARGUMENT, etc.) or timeout (already waited 30s)
+        const isNonRetryable =
+          isTimeout ||
+          (mcpErr && !mcpErr.error.retryable && [
+            'INVALID_ARGUMENT', 'PARCEL_NOT_FOUND', 'TRANSACTION_NOT_FOUND',
+            'SNAPSHOT_NOT_FOUND', 'SOURCE_UNAVAILABLE',
+          ].includes(mcpErr.error.code));
         if (isNonRetryable || attempt === maxRetries) {
           throw err;
         }
@@ -327,6 +332,7 @@ export function useAppState() {
   // --- Search ---
 
   const searchParcels = useCallback(async (query: string) => {
+    const seq = ++searchSeqRef.current;
     if (!query.trim()) {
       setState((s) => ({
         ...s,
@@ -334,6 +340,7 @@ export function useAppState() {
         searchErrorMcp: null,
         searchResults: [],
         searchTotalCount: 0,
+        searchLoading: false,
       }));
       return;
     }
@@ -348,41 +355,25 @@ export function useAppState() {
 
     try {
       // Parse query: support "county district section landNumber" format
-      // Also support partial matching by section name (e.g., "竹篙灣")
       const parts = query.trim().split(/\s+/);
       let county = '';
       let district = '';
       let section = '';
       let landNumber = '';
 
-      // Determine if this looks like a 4-key query or a partial search
       if (parts.length >= 4) {
         [county, district, section, landNumber] = parts;
       } else if (parts.length >= 2) {
-        // Assume county + district + section (no land number)
-        // or county + district + section + landNumber
         county = parts[0] ?? '';
         district = parts[1] ?? '';
         section = parts[2] ?? '';
         landNumber = parts[3] ?? '';
       } else {
-        // Single token — treat as partial section/land_number search
-        // Backend search_parcels requires county + district, so we need
-        // to attempt a broader search. For now, try common counties.
-        // The backend's get_parcel requires all 4 keys.
-        // We'll treat single token as section name and attempt search
-        // with a default county/district if the user provides only that.
         section = parts[0] ?? '';
       }
 
-      // Use search_parcels with best available params
-      // search_parcels requires county + district
       if (!county || !district) {
-        // Try interpreting as section + land_number with known county/district
-        // The spec examples use "竹篙灣段 3615" which is section + landNumber
         if (parts.length >= 2) {
-          // Assume first part is section, second is land number
-          // Try to match against common counties
           county = '';
           district = '';
           section = parts[0] ?? '';
@@ -394,24 +385,20 @@ export function useAppState() {
       let totalCount = 0;
 
       if (county && district) {
-        // Full search
         const resp = await withRetry(() =>
           mcpApi.searchParcels({
             county,
             district,
             ...(section && { section }),
-            // landNumber is not supported by search_parcels — only by get_parcel
             limit: 100,
           }),
         );
+        // Stale check — ignore if user has issued a newer search
+        if (seq !== searchSeqRef.current) return;
         results = resp.parcels ?? [];
         totalCount = resp.total_count ?? results.length;
       } else {
-        // Partial search — try to find parcels matching the section/name
-        // The backend search_parcels requires county+district, so for
-        // bare partial queries we search across known counties.
-        // This is a simplified approach — in production, the backend
-        // would have broader search capability.
+        if (seq !== searchSeqRef.current) return;
         setState((s) => ({
           ...s,
           searchLoading: false,
@@ -421,17 +408,12 @@ export function useAppState() {
         return;
       }
 
-      // Sort results by deterministic ranking per SPEC §7.5:
-      // Exact → Normalized → Prefix → Partial match
-      // Tie-break: county, township, section, parcel_no (alphabetical/numerical)
+      if (seq !== searchSeqRef.current) return;
       results.sort((a, b) => {
-        // Exact match on section + landNumber ranks first
         const aExact = a.section === section && a.land_number === landNumber;
         const bExact = b.section === section && b.land_number === landNumber;
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
-
-        // Normalized exact (case/whitespace normalized)
         const normQuery = query.toLowerCase().trim();
         const aStr = `${a.county}${a.district}${a.section}${a.land_number}`.toLowerCase();
         const bStr = `${b.county}${b.district}${b.section}${b.land_number}`.toLowerCase();
@@ -439,20 +421,14 @@ export function useAppState() {
         const bNorm = bStr === normQuery;
         if (aNorm && !bNorm) return -1;
         if (!aNorm && bNorm) return 1;
-
-        // Prefix match
         const aPrefix = aStr.startsWith(normQuery);
         const bPrefix = bStr.startsWith(normQuery);
         if (aPrefix && !bPrefix) return -1;
         if (!aPrefix && bPrefix) return 1;
-
-        // Partial match (substring)
         const aPartial = aStr.includes(normQuery);
         const bPartial = bStr.includes(normQuery);
         if (aPartial && !bPartial) return -1;
         if (!aPartial && bPartial) return 1;
-
-        // Tie-break: alphabetical by county, district, section, land_number
         if (a.county !== b.county) return a.county.localeCompare(b.county);
         if (a.district !== b.district) return a.district.localeCompare(b.district);
         if (a.section !== b.section) return a.section.localeCompare(b.section);
@@ -469,6 +445,7 @@ export function useAppState() {
         searchErrorMcp: null,
       }));
     } catch (err) {
+      if (seq !== searchSeqRef.current) return;
       const { message, mcpError } = formatError(err);
       setState((s) => ({
         ...s,
