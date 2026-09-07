@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -221,12 +222,18 @@ func (n *Normalizer) NormalizeTransaction(row map[string]string, snapshotID stri
 	return tx, nil
 }
 
-// truncate returns s truncated to at most n bytes. It is safe for UTF-8
-// strings because it only counts bytes, and the DB column limit is on bytes
-// for VARCHAR semantics in PostgreSQL (character varying).
+// truncate returns s truncated to at most n bytes, respecting UTF-8
+// character boundaries so that no multi-byte sequence is split.
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
+	}
+	for i := 0; i < n; {
+		_, size := utf8.DecodeRuneInString(s[i:])
+		if i+size > n {
+			return s[:i]
+		}
+		i += size
 	}
 	return s[:n]
 }
